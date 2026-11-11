@@ -336,15 +336,18 @@ namespace VisualFXExperiment
                             // The tall rear resizable still receives shadows
                             // above and beside the smaller supporting block.
                             // Only subtract pixels the foreground block covers.
-                            const int coverX = camX + s_round2int(support->Location.X);
-                            const int coverY = camY + s_round2int(support->Location.Y);
-                            const int coverW = s_round2int(support->Location.Width);
-                            const int coverH = s_round2int(support->Location.Height);
-                            drawReceiverShadowOutsideRect(sprites[i], x + tileX, y + tileY,
-                                                          tileW, tileH, receiver,
-                                                          srcX, srcY, shadow,
-                                                          coverX, coverY, coverW, coverH);
-                            continue;
+                            if(support->Location.Y >= block.Location.Y)
+                            {
+                                const int coverX = camX + s_round2int(support->Location.X);
+                                const int coverY = camY + s_round2int(support->Location.Y);
+                                const int coverW = s_round2int(support->Location.Width);
+                                const int coverH = s_round2int(support->Location.Height);
+                                drawReceiverShadowOutsideRect(sprites[i], x + tileX, y + tileY,
+                                                              tileW, tileH, receiver,
+                                                              srcX, srcY, shadow,
+                                                              coverX, coverY, coverW, coverH);
+                                continue;
+                            }
                         }
                         drawReceiverShadow(sprites[i], x + tileX, y + tileY, tileW, tileH,
                                            receiver, srcX, srcY, shadow);
