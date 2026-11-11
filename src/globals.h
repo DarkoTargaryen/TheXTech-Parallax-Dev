@@ -271,6 +271,8 @@ struct NPC_t
 //    tempBlock As Integer
     // temp block index in the block array
     vbint_t tempBlock = 0;
+    // Visual effect only: actual sizable ground selected by NPCBlockLogic.
+    int shadowStandingBlock = 0;
 
 //    Active As Boolean 'If on screen
     bool Active = false;
