@@ -527,6 +527,206 @@ namespace VisualFXExperiment
         }
     }
 
+    // Local light sources are combined into a single screen-space field.
+    // Max blending (rather than rendering one translucent halo per object)
+    // prevents double-bright tiles and seams where lava blocks overlap.
+    struct EmissiveLight
+    {
+        int x0, x1, y, radius, strength;
+        bool electric;
+    };
+
+    static bool isLavaBlock(int type)
+    {
+        // Vanilla SMBX / TheXTech lava and burning tiles, including slopes.
+        // Restrict to these IDs because BlockKills also covers non-lava hazards.
+        return type == 30 || type == 371 ||
+               (type >= 404 && type <= 406) || type == 420 ||
+               (type >= 459 && type <= 487);
+    }
+
+    static bool flameNPC(int type)
+    {
+        switch(type)
+        {
+        case NPCID_LAVABUBBLE:
+        case NPCID_PLR_FIREBALL:
+        case NPCID_STATUE_FIRE:
+        case NPCID_VILLAIN_FIRE:
+        case NPCID_PET_FIRE:
+        case NPCID_LAVA_MONSTER:
+        case NPCID_PLANT_FIRE:
+        case NPCID_FIRE_DISK:
+        case NPCID_FIRE_CHAIN:
+        case NPCID_QUAD_BALL:
+        case NPCID_FIRE_BOSS_FIRE:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    static bool flameEffect(int type)
+    {
+        return type == EFFID_BIG_FIREBALL_TAIL ||
+               type == EFFID_LAVA_SPLASH ||
+               type == EFFID_PLR_FIREBALL_TRAIL ||
+               type == EFFID_LAVA_MONSTER_LOOK ||
+               type == EFFID_FIRE_DISK_DIE;
+    }
+
+    static void drawEmissiveLighting(int camX, int camY,
+                                     int screenWidth, int screenHeight,
+                                     const std::vector<BlockRef_t>& deadlyBlocks)
+    {
+        if(screenWidth <= 0 || screenHeight <= 0)
+            return;
+
+        constexpr int cell = 8;
+        const int cols = (screenWidth + cell - 1) / cell;
+        const int rows = (screenHeight + cell - 1) / cell;
+        std::vector<EmissiveLight> lights;
+        lights.reserve(128);
+
+        // Visible fire projectiles and hazards. All positions follow the
+        // actual active NPCs, including fired plant/Bowser/Yoshi projectiles.
+        for(NPCRef_t n : treeNPCQuery(-camX - 96, -camY - 96,
+                                      -camX + screenWidth + 96,
+                                      -camY + screenHeight + 96, SORTMODE_NONE))
+        {
+            const NPC_t& npc = *n;
+            if(npc.Hidden || npc.Killed || !npc.Active || npc.Type <= 0)
+                continue;
+            const bool electric = (npc.Type == NPCID_WALL_SPARK);
+            if(!flameNPC(npc.Type) && !electric)
+                continue;
+            const int x = camX + s_round2int(npc.Location.X + npc.Location.Width / 2);
+            const int y = camY + s_round2int(npc.Location.Y + npc.Location.Height / 2);
+            const int size = s_round2int(std::max(npc.Location.Width, npc.Location.Height));
+            const int radius = std::min(100, std::max(32, size + 22));
+            const int power = electric ? 39 : (npc.Type == NPCID_LAVA_MONSTER ? 56 : 48);
+            lights.push_back({x, x, y, radius, power, electric});
+        }
+
+        // Brief flame tails and lava splashes emit light during their lifetime.
+        for(int i = 1; i <= numEffects; ++i)
+        {
+            const auto& e = Effect[i];
+            if(!flameEffect(e.Type) && e.Type != EFFID_WALL_SPARK_DIE)
+                continue;
+            const int x = camX + s_round2int(e.Location.X + e.Location.Width / 2);
+            const int y = camY + s_round2int(e.Location.Y + e.Location.Height / 2);
+            if(x < -80 || y < -80 || x > screenWidth + 80 || y > screenHeight + 80)
+                continue;
+            const bool electric = e.Type == EFFID_WALL_SPARK_DIE;
+            lights.push_back({x, x, y, 29, 26, electric});
+        }
+
+        // Compute only the exposed upper envelope of lava. At every column,
+        // stacked tiles share the highest visible surface, regardless of how
+        // many tiles overlap beneath it. Adjacent equal-height columns merge
+        // into one continuous light bar with a shared flicker phase.
+        std::vector<int> lavaTop(cols, screenHeight + 1000);
+        for(Block_t& b : deadlyBlocks)
+        {
+            if(b.Hidden || b.Invis || b.Type <= 0 || !isLavaBlock(b.Type))
+                continue;
+            const int left = camX + s_round2int(b.Location.X);
+            const int right = camX + s_round2int(b.Location.X + b.Location.Width);
+            const int top = camY + s_round2int(b.Location.Y);
+            if(right <= 0 || left >= screenWidth || top >= screenHeight + 72)
+                continue;
+            const int first = std::max(0, left / cell);
+            const int last = std::min(cols, (right + cell - 1) / cell);
+            for(int c = first; c < last; ++c)
+            {
+                const int sampleX = c * cell + cell / 2;
+                if(sampleX >= left && sampleX < right)
+                    lavaTop[c] = std::min(lavaTop[c], top);
+            }
+        }
+
+        const int lavaFlicker = s_round2int(std::sin(CommonFrame * 0.065) * 3.0);
+        for(int c = 0; c < cols;)
+        {
+            if(lavaTop[c] > screenHeight + 80)
+            {
+                ++c;
+                continue;
+            }
+            const int top = lavaTop[c];
+            const int first = c;
+            while(c < cols && std::abs(lavaTop[c] - top) <= 2)
+                ++c;
+            lights.push_back({first * cell, std::min(screenWidth, c * cell),
+                              top, 66, 39 + lavaFlicker, false});
+        }
+
+        // One output per 8x8 game-space pixel cell. MAX composition prevents
+        // light stacking from producing seams or blown-out yellow areas.
+        std::vector<uint8_t> warm(cols * rows, 0);
+        std::vector<uint8_t> blue(cols * rows, 0);
+        for(const EmissiveLight& l : lights)
+        {
+            const int startC = std::max(0, (l.x0 - l.radius) / cell);
+            const int endC = std::min(cols, (l.x1 + l.radius + cell - 1) / cell);
+            const int startR = std::max(0, (l.y - l.radius) / cell);
+            const int endR = std::min(rows, (l.y + l.radius + cell - 1) / cell);
+            for(int ry = startR; ry < endR; ++ry)
+            {
+                const int dy = ry * cell + cell / 2 - l.y;
+                for(int cx = startC; cx < endC; ++cx)
+                {
+                    const int sx = cx * cell + cell / 2;
+                    const int dx = sx < l.x0 ? l.x0 - sx : (sx > l.x1 ? sx - l.x1 : 0);
+                    const int distSquared = dx * dx + dy * dy;
+                    if(distSquared >= l.radius * l.radius)
+                        continue;
+                    const double falloff = 1.0 - std::sqrt(double(distSquared)) / l.radius;
+                    const int power = s_round2int(l.strength * falloff * falloff);
+                    if(power <= 0)
+                        continue;
+                    uint8_t& out = (l.electric ? blue : warm)[ry * cols + cx];
+                    out = std::max(out, static_cast<uint8_t>(std::min(65, power)));
+                }
+            }
+        }
+
+        // Coalesce cells of similar strength into horizontal runs to keep
+        // draw calls modest. A small global cap also limits mixed fire+lava.
+        for(int y = 0; y < rows; ++y)
+        {
+            for(int x = 0; x < cols;)
+            {
+                const int idx = y * cols + x;
+                const bool isBlue = blue[idx] > warm[idx];
+                const uint8_t intensity = isBlue ? blue[idx] : warm[idx];
+                const int quantized = (intensity + 3) / 6;
+                if(quantized == 0)
+                {
+                    ++x;
+                    continue;
+                }
+                const int first = x++;
+                while(x < cols)
+                {
+                    const int next = y * cols + x;
+                    const bool nextBlue = blue[next] > warm[next];
+                    const uint8_t nextStrength = nextBlue ? blue[next] : warm[next];
+                    if(nextBlue != isBlue || (nextStrength + 3) / 6 != quantized)
+                        break;
+                    ++x;
+                }
+                const int opacity = std::min(65, quantized * 6);
+                XRender::renderRect(first * cell, y * cell,
+                                    std::min(screenWidth, x * cell) - first * cell,
+                                    std::min(cell, screenHeight - y * cell),
+                                    isBlue ? XTColor(145, 195, 255, opacity)
+                                           : XTColor(255, 177, 93, opacity), true);
+            }
+        }
+    }
+
     static void drawReflections(const std::vector<Sprite>& sprites,
                                 int camX, int camY, int screenWidth, int screenHeight)
     {
