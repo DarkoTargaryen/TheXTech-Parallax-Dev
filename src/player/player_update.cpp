@@ -63,7 +63,11 @@ void UpdatePlayer()
     {
         // reset variables
         Player[A].ShowWarp = 0;
-        Player[A].shadowStandingBlock = 0;
+        // During buried-item pickup, the character's feet can temporarily move
+        // into the floor and the collision query may not report floorBlock.
+        // Keep that support only while the grab animation is actively running.
+        if(Player[A].GrabTime <= 0)
+            Player[A].shadowStandingBlock = 0;
         Player[A].mountBump = 0;
 
         // this was shared over players in SMBX 1.3 -- if the line marked "MOST CURSED LINE" in player_block_logic.cpp becomes a source of incompatibility, we will need to restore that logic
