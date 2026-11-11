@@ -753,20 +753,11 @@ namespace VisualFXExperiment
 
             for(const Sprite& sprite : sprites)
             {
-                // Only reflect pixels that are actually ABOVE the waterline.
-                // Previously, underwater pixels were mirrored back through the
-                // surface, causing characters to overlap their own reflection.
-                const int visibleBottom = std::min(wy, sprite.y + sprite.height);
-                if(visibleBottom <= sprite.y)
-                    continue;
-
                 int groupTop = sprite.y;
                 int groupBottom = sprite.y + sprite.height;
                 if(sprite.is_actor)
                 {
-                    // Rider and mount are separate textures with the same
-                    // physical actor bounds. Fade/clip them as ONE silhouette
-                    // (shoe, Yoshi, clown car), not as independent sprites.
+                    // Mount/rider components share a single submersion curve.
                     for(const Sprite& part : sprites)
                     {
                         if(!part.is_actor || part.is_player != sprite.is_player ||
@@ -778,31 +769,23 @@ namespace VisualFXExperiment
                     }
                 }
 
-                double submersionFade = 1.0;
-                if(groupBottom > wy)
-                {
-                    const int groupHeight = std::max(1, groupBottom - groupTop);
-                    const double submerged = std::min(1.0,
-                        double(groupBottom - wy) / groupHeight);
-                    submersionFade = 1.0 - submerged;
-                }
-                if(submersionFade <= 0.0)
+                // Preserve the whole mirrored silhouette instead of cropping
+                // it abruptly at the waterline. A smooth opacity transition
+                // handles entry/exit and hides portions behind the real actor.
+                const double totalHeight = std::max(1, groupBottom - groupTop);
+                const double visible = std::max(0.0, std::min(1.0,
+                    (wy - groupTop) / totalHeight));
+                if(visible <= 0.0)
                     continue;
+                const double submersionFade = visible * visible * (3.0 - 2.0 * visible);
 
                 Sprite mirrored = sprite;
-                mirrored.height = visibleBottom - sprite.y;
-                mirrored.y = 2 * wy - visibleBottom;
-
-                int startY = std::max(wy, mirrored.y);
-                // Ensure a submerged actor is drawn above its own reflection.
-                // This applies to the entire visible mount/rider silhouette.
-                if(sprite.is_actor)
-                    startY = std::max(startY, groupBottom);
+                mirrored.y = 2 * wy - (sprite.y + sprite.height);
+                const int startY = std::max(wy, mirrored.y);
                 const int endY = std::min(wy + wh, mirrored.y + mirrored.height);
                 if(startY >= endY)
                     continue;
 
-                // Preserve existing pixel-aligned ripples and the depth fade.
                 for(int stripY = startY; stripY < endY; stripY += 4)
                 {
                     const int stripH = std::min(4, endY - stripY);
@@ -810,13 +793,25 @@ namespace VisualFXExperiment
                     const double depthFade = std::max(0.0, 1.0 - depth / 112.0);
                     if(depthFade <= 0.0)
                         break;
+
+                    // Fade across the actor/reflection intersection instead
+                    // of imposing the previous hard 'start at groupBottom'.
+                    // This keeps a natural reflection when jumping into water.
+                    double overlapFade = 1.0;
+                    if(sprite.is_actor && groupBottom > wy)
+                    {
+                        const double blend = std::max(0.0, std::min(1.0,
+                            (stripY - groupBottom + 12.0) / 28.0));
+                        overlapFade = blend * blend * (3.0 - 2.0 * blend);
+                    }
+                    const int opacity = s_round2int(110 * depthFade *
+                                                     submersionFade * overlapFade);
+                    if(opacity <= 0)
+                        continue;
                     const double phase = depth * 0.19 + CommonFrame * 0.055;
                     const int shift = s_round2int(std::sin(phase) * 2.0);
                     Sprite rippled = mirrored;
                     rippled.x += shift;
-                    const int opacity = s_round2int(110 * depthFade * submersionFade);
-                    if(opacity <= 0)
-                        continue;
                     drawClipped(rippled, wx, stripY, ww, stripH, true,
                                 XTColor(155, 195, 220, static_cast<uint8_t>(opacity)));
                 }
