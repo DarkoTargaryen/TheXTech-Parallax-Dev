@@ -108,7 +108,7 @@ namespace VisualFXExperiment
         const XTColor shadow(16, 20, 29, 100);
         for(BaseRef_t ref : bgos)
         {
-            const Background_t& bgo = Background[ref];
+            const Background_t& bgo = Background[static_cast<int>(ref)];
             if(bgo.Hidden || bgo.Type <= 0)
                 continue;
             const int x = camX + s_round2int(bgo.Location.X);
