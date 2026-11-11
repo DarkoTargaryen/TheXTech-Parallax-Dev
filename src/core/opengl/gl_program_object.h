@@ -213,6 +213,8 @@ public:
     /*!
      * \brief Reports whether there is a valid program stored in the object
      */
+    inline GLuint program_id() const { return m_program; }
+
     inline bool inited() const
     {
         return m_program != 0;
