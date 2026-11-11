@@ -1594,6 +1594,13 @@ void UpdateNPCs()
 
                         NPCBlockLogic(A, tempHit, tempHitBlock, tempSpeedA, numTempBlock, speedVar);
 
+                        // The real NPC floor contact is more reliable than visual
+                        // foot-distance checks, especially on moving/stacked blocks.
+                        if(tempHit != 0 && tempHitBlock > 0 && tempHitBlock <= numBlock &&
+                           BlockIsSizable[Block[tempHitBlock].Type] &&
+                           !Block[tempHitBlock].Hidden && !Block[tempHitBlock].Invis)
+                            NPC[A].shadowStandingBlock = tempHitBlock;
+
 
                         // End Block Collision
                         // possible usually-nulled function pointer for logic between block and NPC collisions
