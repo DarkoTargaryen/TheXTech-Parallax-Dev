@@ -23,6 +23,138 @@
 #include "../collision.h"
 #include "../core/render.h"
 #include "config.h"
+#include <IniProcessor/ini_processing.h>
+#include <Utils/files.h>
+#include <cmath>
+#include <memory>
+#include <vector>
+#include <algorithm>
+
+
+
+// Experimental layered background renderer. This is a limited INI subset,
+// NOT a complete implementation of the Moondust background2 specification.
+namespace
+{
+struct ParallaxLayer
+{
+    std::unique_ptr<StdPicture> texture;
+    double speedX = 0.5, speedY = 0.5;
+    double offsetX = 0.0, offsetY = 0.0;
+    bool repeatX = true, repeatY = false, foreground = false;
+};
+
+std::vector<ParallaxLayer> s_parallaxLayers;
+std::string s_parallaxConfigKey;
+bool s_hasParallax = false;
+
+void s_loadParallax(int section)
+{
+    const std::string key = FileNamePath + "|" + FileName + "|" + std::to_string(Background2[section]);
+    if(key == s_parallaxConfigKey)
+        return;
+
+    // Discard old textures on level / selected background change.
+    s_parallaxLayers.clear();
+    s_hasParallax = false;
+    s_parallaxConfigKey = key;
+
+    const std::string iniName = "background2-" + std::to_string(Background2[section]) + ".ini";
+    std::string configPath = FileNamePath + FileName + "/" + iniName;
+    if(!Files::fileExists(configPath))
+        configPath = FileNamePath + iniName;
+    if(!Files::fileExists(configPath))
+        return;
+
+    IniProcessing ini = Files::load_ini(configPath);
+    int count = 0;
+    ini.beginGroup("background");
+    ini.read("layers", count, 0);
+    ini.endGroup();
+    count = std::max(0, std::min(count, 32));
+
+    const std::string imageDir = Files::dirname(configPath) + "/";
+    for(int i = 1; i <= count; ++i)
+    {
+        ParallaxLayer l;
+        std::string image;
+        ini.beginGroup("layer-" + std::to_string(i));
+        ini.read("image", image, std::string());
+        ini.read("scroll-x", l.speedX, 0.5);
+        ini.read("scroll-y", l.speedY, 0.5);
+        ini.read("offset-x", l.offsetX, 0.0);
+        ini.read("offset-y", l.offsetY, 0.0);
+        ini.read("repeat-x", l.repeatX, true);
+        ini.read("repeat-y", l.repeatY, false);
+        ini.read("foreground", l.foreground, false);
+        ini.endGroup();
+
+        // Reject absolute paths and parent traversal in episode-supplied configs.
+        if(image.empty() || image.find("..") != std::string::npos ||
+           image[0] == '/' || image[0] == '\\' || image.find(':') != std::string::npos)
+            continue;
+        const std::string path = imageDir + image;
+        if(!Files::fileExists(path))
+            continue;
+
+        l.texture.reset(new StdPicture());
+        XRender::lazyLoadPicture(*l.texture, path);
+        s_parallaxLayers.push_back(std::move(l));
+    }
+    s_hasParallax = !s_parallaxLayers.empty();
+}
+
+void s_renderParallax(int section, int view, bool foreground)
+{
+    s_loadParallax(section);
+    if(!s_hasParallax)
+        return;
+
+    const double cameraX = -vScreen[view].CameraAddX();
+    const double cameraY = -vScreen[view].CameraAddY();
+    const double width = vScreen[view].Width;
+    const double height = vScreen[view].Height;
+
+    for(auto& layer : s_parallaxLayers)
+    {
+        if(layer.foreground != foreground)
+            continue;
+        StdPicture& picture = *layer.texture;
+        XRender::lazyPreLoad(picture);
+        if(picture.w <= 0 || picture.h <= 0)
+            continue;
+
+        const double tileW = picture.w;
+        const double tileH = picture.h;
+        // Camera-relative position: a factor of 0 stays fixed to screen,
+        // a factor of 1 scrolls at normal world-space speed.
+        double x = layer.offsetX - cameraX * layer.speedX;
+        double y = layer.offsetY - cameraY * layer.speedY;
+        if(layer.repeatX)
+            x -= std::floor(x / tileW) * tileW;
+        if(layer.repeatY)
+            y -= std::floor(y / tileH) * tileH;
+        if(layer.repeatX && x > 0) x -= tileW;
+        if(layer.repeatY && y > 0) y -= tileH;
+
+        const int columns = layer.repeatX ? std::min(512, (int)std::ceil((width - x) / tileW) + 1) : 1;
+        const int rows = layer.repeatY ? std::min(512, (int)std::ceil((height - y) / tileH) + 1) : 1;
+        for(int ry = 0; ry < rows; ++ry)
+            for(int rx = 0; rx < columns; ++rx)
+            {
+                double px = x + rx * tileW;
+                double py = y + ry * tileH;
+                if(px < width && py < height && px + tileW > 0 && py + tileH > 0)
+                    XRender::renderTexture(px, py, picture.w, picture.h, picture, 0, 0);
+            }
+    }
+}
+} // namespace
+
+void DrawParallaxForeground(int section, int view)
+{
+    s_renderParallax(section, view, true);
+}
 
 void DrawBackgroundColor(int A, int Z, bool lower = false)
 {
@@ -370,6 +502,15 @@ void DrawBackground(int S, int Z)
     if(LevelEditor)
         LevelREAL[S] = level[S];
     level[S] = LevelREAL[S];
+
+    s_loadParallax(S);
+    if(s_hasParallax)
+    {
+        XRender::renderRect(0, 0, vScreen[Z].Width, vScreen[Z].Height, {0, 0, 0});
+        s_renderParallax(S, Z, false);
+        level[S] = tempLevel;
+        return;
+    }
 
     if(Background2[S] == 0)
         XRender::renderRect(0, 0, vScreen[Z].Width, vScreen[Z].Height, {0, 0, 0});

@@ -2944,6 +2944,7 @@ void UpdateGraphicsScreen(Screen_t& screen)
         }
 
         XRender::setDrawPlane(PLANE_LVL_SECTION_FG);
+        DrawParallaxForeground(S, Z);
 
 #ifdef THEXTECH_BUILD_GL_MODERN
         if(SectionParticlesFG[S])
