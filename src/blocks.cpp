@@ -779,7 +779,9 @@ void BlockHit(int A, bool HitDown, int whatPlayer)
                         {
                             powerup.Effect = NPCEFF_EMERGE_DOWN;
                             powerup.Location.Y = b.Location.Y + 4;
-                            powerup.Location.Height = powerup->THeight;
+                            // Keep staggered items invisible until their
+                            // own downward emergence begins.
+                            powerup.Location.Height = 0;
                         }
 
                         if(item > 0)
