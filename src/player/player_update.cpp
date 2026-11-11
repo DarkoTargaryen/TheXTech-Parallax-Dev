@@ -282,7 +282,8 @@ void UpdatePlayer()
                 // princess peach and toad stuff
                 if(Player[A].Character == 3 || Player[A].Character == 4 || Player[A].Character == 5)
                 {
-                    Player[A].HeldBonus = NPCID(0);
+                    if(Player[A].Character == 5)
+                        Player[A].HeldBonus = NPCID(0);
                     // power up limiter
                     // If (.Character = 3 Or .Character = 4) And .State > 3 And .State <> 7 Then .State = 2
 
@@ -296,7 +297,9 @@ void UpdatePlayer()
                     if(Player[A].Slide)
                         Player[A].Slide = false;
 
-                    // If .Stoned = True Then .Stoned = False
+                    // Link retains the heart system; Peach and Toad use reserve items.
+                    if(Player[A].Character == 5)
+                    {
                     if(Player[A].Hearts == 1 && Player[A].State > 1)
                         Player[A].Hearts = 2;
 
@@ -311,6 +314,9 @@ void UpdatePlayer()
                         if(Player[A].State >= 2)
                             Player[A].Hearts = 2;
                     }
+                    }
+                    else
+                        Player[A].Hearts = 0;
                 }
 
                 // link stuff
@@ -404,7 +410,8 @@ void UpdatePlayer()
                     Player[A].Multiplier = 0;
 
                 // Player-player collisions
-                PlayerCollide(A);
+                if(BattleMode)
+                    PlayerCollide(A);
 
                 // Talk to NPC
                 if(MessageNPC > 0)
