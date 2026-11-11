@@ -81,15 +81,84 @@ namespace VisualFXExperiment
                     playerHeight = s_round2int(p.Location.Height) - 26 - offY + peachCorrection;
                 }
             }
+            int riderX = playerX + offX;
+            int riderY = playerY + offY + ((p.Mount == 1 && p.Character == 4 && p.State == 1) ? 6 : 0);
+            if(p.Mount == 3)
+                riderY += p.MountOffsetY;
+            if(p.Mount == 2)
+            {
+                // The clown car draws its rider in gfx_update.cpp, cropped
+                // to the upper body and offset relative to the vehicle.
+                int yOffset = 30;
+                if(p.State == 1)
+                    yOffset = 24;
+                else if(p.Character == 2)
+                    yOffset = 38;
+                else if(p.Character == 1)
+                    yOffset = 36;
+                riderX = playerX + offX -
+                         s_round2int(Physics.PlayerWidth[p.Character][p.State] / 2.0) + 64;
+                riderY = playerY + offY + p.MountOffsetY - yOffset;
+                playerHeight = s_round2int(p.Location.Height) - 20 - p.MountOffsetY;
+            }
             if(playerHeight > 0)
-                addSprite(sprites, tx,
-                          playerX + offX,
-                          playerY + offY + ((p.Mount == 1 && p.Character == 4 && p.State == 1) ? 6 : 0),
+                addSprite(sprites, tx, riderX, riderY,
                           pfrW(tx, p), playerHeight, pfrX(tx, p), pfrY(tx, p),
                           screenWidth, screenHeight,
                           &p.Location, Physics.PlayerGravity, p.shadowStandingBlock, true,
                           p.GrabTime > 0);
 
+            if(p.Mount == 3 && p.MountType >= 1)
+            {
+                // Exact head/body positions and frames from DrawPlayer.
+                const int yoshiX = camX + s_round2int(p.Location.X);
+                const int yoshiY = camY + s_round2int(p.Location.Y);
+                addSprite(sprites, GFXYoshiB[p.MountType],
+                          yoshiX + p.YoshiBX, yoshiY + p.YoshiBY,
+                          32, 32, 0, 32 * p.YoshiBFrame, screenWidth, screenHeight,
+                          &p.Location, Physics.PlayerGravity, p.shadowStandingBlock, true,
+                          p.GrabTime > 0);
+                addSprite(sprites, GFXYoshiT[p.MountType],
+                          yoshiX + p.YoshiTX, yoshiY + p.YoshiTY,
+                          32, 32, 0, 32 * p.YoshiTFrame, screenWidth, screenHeight,
+                          &p.Location, Physics.PlayerGravity, p.shadowStandingBlock, true,
+                          p.GrabTime > 0);
+                if(p.MountSpecial > 0)
+                {
+                    const int tongueX = camX + s_round2int(p.YoshiTongueX) -
+                                        ((p.Direction == -1) ? p.YoshiTongueLength : 0) - 1;
+                    const int tongueY = camY + s_round2int(p.YoshiTongue.Y);
+                    addSprite(sprites, GFX.Tongue[2], tongueX, tongueY,
+                              p.YoshiTongueLength + 2, 16, 0, 0,
+                              screenWidth, screenHeight,
+                              &p.Location, Physics.PlayerGravity, p.shadowStandingBlock, true,
+                              p.GrabTime > 0);
+                    addSprite(sprites, GFX.Tongue[1],
+                              camX + s_round2int(p.YoshiTongue.X), tongueY,
+                              16, 16, 0, 16 * ((p.Direction == 1) ? 0 : 1),
+                              screenWidth, screenHeight,
+                              &p.Location, Physics.PlayerGravity, p.shadowStandingBlock, true,
+                              p.GrabTime > 0);
+                }
+                if(p.YoshiBlue)
+                    addSprite(sprites, GFX.YoshiWings,
+                              yoshiX + p.YoshiBX + ((p.Direction == 1) ? -12 : 12),
+                              yoshiY + p.YoshiBY - 16,
+                              32, 32, 0, 32 * p.YoshiWingsFrame,
+                              screenWidth, screenHeight,
+                              &p.Location, Physics.PlayerGravity, p.shadowStandingBlock, true,
+                              p.GrabTime > 0);
+            }
+            if(p.Mount == 2)
+            {
+                addSprite(sprites, GFX.Mount[p.Mount],
+                          playerX + s_round2int(p.Location.Width) / 2 - 64,
+                          playerY + s_round2int(p.Location.Height) - 128,
+                          128, 128, 0, 128 * p.MountFrame,
+                          screenWidth, screenHeight,
+                          &p.Location, Physics.PlayerGravity, p.shadowStandingBlock, true,
+                          p.GrabTime > 0);
+            }
             if(p.Mount == 1 && p.MountType >= 1 && p.MountType <= 3)
             {
                 // The boot is a separate 32x32 sprite, drawn at these exact
@@ -102,6 +171,14 @@ namespace VisualFXExperiment
                           &p.Location, Physics.PlayerGravity, p.shadowStandingBlock, true,
                           p.GrabTime > 0);
             }
+            if((p.Mount == 1 && p.MountType == 3) || p.Effect == PLREFF_COOP_WINGS)
+                addSprite(sprites, GFX.YoshiWings,
+                          playerX + ((p.Direction == 1) ? -24 : 16),
+                          playerY + s_round2int(p.Location.Height) - 40,
+                          32, 32, 0, 32 * p.YoshiWingsFrame,
+                          screenWidth, screenHeight,
+                          &p.Location, Physics.PlayerGravity, p.shadowStandingBlock, true,
+                          p.GrabTime > 0);
         }
 
         // NPCs include vines and enemies: use the engine's current animation frame.
