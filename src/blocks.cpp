@@ -750,6 +750,7 @@ void BlockHit(int A, bool HitDown, int whatPlayer)
                     const int spacing = itemWidth + 6;
                     const bool leafPop = (!HitDown && templateNpc.Type == NPCID_LEAF_POWER);
 
+                    const bool yoshiBlock = NPCIsYoshi(C);
                     for(int item = 0; item < count; ++item)
                     {
                         if(item > 0)
@@ -758,19 +759,39 @@ void BlockHit(int A, bool HitDown, int whatPlayer)
                             NPC[numNPCs] = templateNpc;
                         }
                         NPC_t& powerup = NPC[numNPCs];
+                        // A Yoshi block gives Mario/Luigi the original Yoshi.
+                        // Peach, Toad and Link get a compatible shoe instead.
+                        // A shoe block already gives everyone the same shoe.
+                        if(yoshiBlock && Player[item + 1].Character != 1 &&
+                           Player[item + 1].Character != 2)
+                        {
+                            powerup.Type = NPCID_GRN_BOOT;
+                            powerup.Special = 0;
+                            powerup.Frame = 0;
+                            powerup.Location.Width = powerup->TWidth;
+                        }
+                        else if(yoshiBlock)
+                        {
+                            powerup.Type = NPCID_ITEM_POD;
+                            powerup.Special = C;
+                            powerup.Location.Width = powerup->TWidth;
+                        }
+
+                        // One shared source: every object begins directly
+                        // above/below the struck block, regardless of target.
+                        powerup.Location.X = b.Location.X +
+                            (b.Location.Width - powerup.Location.Width) / 2.0;
+                        powerup.multiplayerPowerupOriginX = powerup.Location.X;
                         powerup.multiplayerPowerupEmerging = true;
                         powerup.multiplayerLeafPop = leafPop;
                         powerup.multiplayerPowerupTargetX = centreX +
                             (item - (count - 1) * 0.5) * spacing;
-                        powerup.Effect2 = -item * 9; // nine-frame natural stagger
+                        powerup.Effect2 = -item * 8; // each comes out of ONE block
                         powerup.Location.SpeedX = 0;
                         powerup.Location.SpeedY = 0;
 
                         if(!HitDown)
                         {
-                            // Leaves pop from the opening first, then enter
-                            // their existing flutter physics with an upward
-                            // bounce; other bonuses retain normal emergence.
                             powerup.Effect = NPCEFF_EMERGE_UP;
                             powerup.Location.Y = b.Location.Y;
                             powerup.Location.Height = 0;
@@ -779,8 +800,6 @@ void BlockHit(int A, bool HitDown, int whatPlayer)
                         {
                             powerup.Effect = NPCEFF_EMERGE_DOWN;
                             powerup.Location.Y = b.Location.Y + 4;
-                            // Keep staggered items invisible until their
-                            // own downward emergence begins.
                             powerup.Location.Height = 0;
                         }
 
