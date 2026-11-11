@@ -24,7 +24,7 @@
 #include "../core/render.h"
 #include "config.h"
 #include <IniProcessor/ini_processing.h>
-#include <Utils/files.h>
+#include <Utils/files_ini.h>
 #include <cmath>
 #include <memory>
 #include <vector>
