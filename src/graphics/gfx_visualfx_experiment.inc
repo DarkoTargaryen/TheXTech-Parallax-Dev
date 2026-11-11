@@ -1,5 +1,5 @@
 // Experimental visual effects for the isolated shadow-experiment branch.
-// This initial prototype uses receiver BOUNDS (not exact alpha-mask pixels).
+// Shadows now mask against the receiver's visible pixels (PNG alpha / GIF mask).
 // It never modifies level graphics, object physics, or game data.
 namespace VisualFXExperiment
 {
@@ -100,12 +100,34 @@ namespace VisualFXExperiment
                                      reflected ? X_FLIP_VERTICAL : X_FLIP_NONE, tint);
     }
 
+    // Draw a caster silhouette where BOTH the caster and receiver are opaque.
+    // The backend handles PNG alpha plus legacy GIF bitmasks automatically.
+    static void drawReceiverShadow(const Sprite& sprite,
+                                   int rx, int ry, int rw, int rh,
+                                   StdPicture& receiver, int receiverSrcX, int receiverSrcY,
+                                   XTColor tint)
+    {
+        const int sx = sprite.x + 8;
+        const int sy = sprite.y + 8;
+        const int l = std::max(rx, sx), t = std::max(ry, sy);
+        const int r = std::min(rx + rw, sx + sprite.width);
+        const int b = std::min(ry + rh, sy + sprite.height);
+        if(r <= l || b <= t)
+            return;
+        XRender::renderMaskedShadow(l, t, r - l, b - t,
+                                    *sprite.texture, sprite.src_x + l - sx,
+                                    sprite.src_y + t - sy,
+                                    receiver, receiverSrcX + l - rx,
+                                    receiverSrcY + t - ry, tint);
+    }
+
     static void drawShadows(const std::vector<Sprite>& sprites,
                             int camX, int camY,
                             const std::vector<BaseRef_t>& bgos,
                             const std::vector<BlockRef_t>& sizable)
     {
         const XTColor shadow(16, 20, 29, 100);
+        // BGO receivers only: water/quicksand are NEVER drawn as shadow targets.
         for(BaseRef_t ref : bgos)
         {
             const Background_t& bgo = Background[static_cast<int>(ref)];
@@ -115,20 +137,35 @@ namespace VisualFXExperiment
             const int y = camY + s_round2int(bgo.Location.Y);
             const int w = s_round2int(bgo.Location.Width);
             const int h = s_round2int(bgo.Location.Height);
+            StdPicture& receiver = GFXBackgroundBMP[bgo.Type];
+            const int srcY = BackgroundHeight[bgo.Type] * BackgroundFrame[bgo.Type];
             for(const Sprite& sprite : sprites)
-                drawClipped(sprite, x, y, w, h, false, shadow);
+                drawReceiverShadow(sprite, x, y, w, h, receiver, 0, srcY, shadow);
         }
 
         for(Block_t& block : sizable)
         {
-            if(block.Hidden || block.Invis)
+            if(block.Hidden || block.Invis || block.Type <= 0)
                 continue;
             const int x = camX + s_round2int(block.Location.X);
             const int y = camY + s_round2int(block.Location.Y);
             const int w = s_round2int(block.Location.Width);
             const int h = s_round2int(block.Location.Height);
-            for(const Sprite& sprite : sprites)
-                drawClipped(sprite, x, y, w, h, false, shadow);
+            StdPicture& receiver = GFXBlockBMP[block.Type];
+            // Sizable blocks use a 3x3 texture: source cells are 0, 32 and 64.
+            for(int tileY = 0; tileY < h; tileY += 32)
+            {
+                const int tileH = std::min(32, h - tileY);
+                const int srcY = tileY == 0 ? 0 : (tileY + 32 >= h ? 64 : 32);
+                for(int tileX = 0; tileX < w; tileX += 32)
+                {
+                    const int tileW = std::min(32, w - tileX);
+                    const int srcX = tileX == 0 ? 0 : (tileX + 32 >= w ? 64 : 32);
+                    for(const Sprite& sprite : sprites)
+                        drawReceiverShadow(sprite, x + tileX, y + tileY, tileW, tileH,
+                                           receiver, srcX, srcY, shadow);
+                }
+            }
         }
     }
 
