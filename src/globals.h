@@ -782,6 +782,9 @@ struct Player_t
     int StandingOnNPC = 0;
 //    StandingOnTempNPC As Integer 'The NPC the player is standing on
     int StandingOnVehiclePlr = 0;
+    // Visual-only: resizable support selected by PlayerBlockLogic this frame.
+    // Reset every update; never used to alter physical collisions.
+    int shadowStandingBlock = 0;
 //    UnStart As Boolean 'Player let go of the start button
     bool UnStart = false;
 //    mountBump As Single 'Player hit something while in a mount
