@@ -746,7 +746,7 @@ void BlockHit(int A, bool HitDown, int whatPlayer)
                     const NPC_t templateNpc = NPC[firstNpc];
                     const double centreX = templateNpc.Location.X;
                     const int itemWidth = std::max(24,
-                        s_round2int(templateNpc.Location.Width));
+                        static_cast<int>(templateNpc.Location.Width + 0.5));
                     const int spacing = itemWidth + 6;
                     const bool leafPop = (!HitDown && templateNpc.Type == NPCID_LEAF_POWER);
 
