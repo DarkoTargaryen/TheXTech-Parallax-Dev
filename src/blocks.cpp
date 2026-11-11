@@ -46,6 +46,42 @@
 #include "main/trees.h"
 
 
+// Multiply actual power-ups, not coins or arbitrary level-interaction items.
+// Existing character-specific replacements are resolved before this check.
+static bool s_multiplayerPowerup(NPCID type)
+{
+    switch(type)
+    {
+    case NPCID_POWER_S1:
+    case NPCID_POWER_S2:
+    case NPCID_POWER_S3:
+    case NPCID_POWER_S4:
+    case NPCID_POWER_S5:
+    case NPCID_FIRE_POWER_S1:
+    case NPCID_FIRE_POWER_S3:
+    case NPCID_FIRE_POWER_S4:
+    case NPCID_ICE_POWER_S3:
+    case NPCID_ICE_POWER_S4:
+    case NPCID_LEAF_POWER:
+    case NPCID_STATUE_POWER:
+    case NPCID_HEAVY_POWER:
+    case NPCID_CANNONITEM:
+    case NPCID_FLY_POWER:
+    case NPCID_SWAP_POWER:
+    case NPCID_LIFE_S1:
+    case NPCID_LIFE_S3:
+    case NPCID_LIFE_S4:
+    case NPCID_3_LIFE:
+    case NPCID_ITEM_POD:
+    case NPCID_GRN_BOOT:
+    case NPCID_RED_BOOT:
+    case NPCID_BLU_BOOT:
+        return true;
+    default:
+        return false;
+    }
+}
+
 void BlockHit(int A, bool HitDown, int whatPlayer)
 {
     // int tempPlayer = 0;
@@ -557,17 +593,11 @@ void BlockHit(int A, bool HitDown, int whatPlayer)
             }
             else if(replacement != C)
             {
-                // if any player is small, then replace the NPC
-                bool do_replace = false;
-
-                for(auto B = 1; B <= numPlayers; B++)
-                {
-                    if(Player[B].State == 1 && Player[B].Character != 5)
-                    {
-                        do_replace = true;
-                        break;
-                    }
-                }
+                // The block hitter determines the power-up for everyone.
+                // Other players' current sizes must not change the result.
+                const bool do_replace = (whatPlayer > 0 &&
+                                         Player[whatPlayer].State == 1 &&
+                                         Player[whatPlayer].Character != 5);
 
                 if(!do_replace)
                     nn.Type = C;
@@ -699,6 +729,66 @@ void BlockHit(int A, bool HitDown, int whatPlayer)
                nn.Type == NPCID_3_LIFE || nn.Type == NPCID_FLIPPED_RAINBOW_SHELL)
             {
                 nn.TimeLeft = Physics.NPCTimeOffScreen * 20;
+            }
+
+            // Produce one identical selected power-up per player. All items
+            // originate at the same block centre, then fan out during the
+            // standard emergence animation in npc_effects.cpp. Extra items
+            // are staggered so their visible sprites do not pile up.
+            if(whatPlayer > 0 && numPlayers > 1 &&
+               s_multiplayerPowerup(nn.Type))
+            {
+                const int firstNpc = numNPCs;
+                const int count = std::min(4, std::min(numPlayers,
+                                                       maxNPCs - numNPCs + 1));
+                if(count > 1)
+                {
+                    const NPC_t templateNpc = NPC[firstNpc];
+                    const double centreX = templateNpc.Location.X;
+                    const int itemWidth = std::max(24,
+                        s_round2int(templateNpc.Location.Width));
+                    const int spacing = itemWidth + 6;
+                    const bool leafPop = (!HitDown && templateNpc.Type == NPCID_LEAF_POWER);
+
+                    for(int item = 0; item < count; ++item)
+                    {
+                        if(item > 0)
+                        {
+                            ++numNPCs;
+                            NPC[numNPCs] = templateNpc;
+                        }
+                        NPC_t& powerup = NPC[numNPCs];
+                        powerup.multiplayerPowerupEmerging = true;
+                        powerup.multiplayerLeafPop = leafPop;
+                        powerup.multiplayerPowerupTargetX = centreX +
+                            (item - (count - 1) * 0.5) * spacing;
+                        powerup.Effect2 = -item * 9; // nine-frame natural stagger
+                        powerup.Location.SpeedX = 0;
+                        powerup.Location.SpeedY = 0;
+
+                        if(!HitDown)
+                        {
+                            // Leaves pop from the opening first, then enter
+                            // their existing flutter physics with an upward
+                            // bounce; other bonuses retain normal emergence.
+                            powerup.Effect = NPCEFF_EMERGE_UP;
+                            powerup.Location.Y = b.Location.Y;
+                            powerup.Location.Height = 0;
+                        }
+                        else
+                        {
+                            powerup.Effect = NPCEFF_EMERGE_DOWN;
+                            powerup.Location.Y = b.Location.Y + 4;
+                            powerup.Location.Height = powerup->THeight;
+                        }
+
+                        if(item > 0)
+                        {
+                            syncLayers_NPC(numNPCs);
+                            CheckSectionNPC(numNPCs);
+                        }
+                    }
+                }
             }
         }
 #if 0 // don't spawn players from blocks anymore
