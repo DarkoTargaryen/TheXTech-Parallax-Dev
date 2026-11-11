@@ -293,8 +293,69 @@ namespace VisualFXExperiment
             const int h = s_round2int(bgo.Location.Height);
             StdPicture& receiver = GFXBackgroundBMP[bgo.Type];
             const int srcY = BackgroundHeight[bgo.Type] * BackgroundFrame[bgo.Type];
+            // A BGO sits behind sizable blocks. Subtract the visible sizable
+            // rectangles before submitting its shadow; otherwise the shadow
+            // pass (drawn later) paints BGO silhouettes over foreground floors.
+            // Clip only the caster/receiver overlap to avoid splitting entire
+            // large BGOs for every sizable in the scene.
+            struct ShadowPiece
+            {
+                int x, y, w, h;
+            };
             for(const Sprite& sprite : sprites)
-                drawReceiverShadow(sprite, x, y, w, h, receiver, 0, srcY, shadow);
+            {
+                const int left = std::max(x, sprite.x + 8);
+                const int top = std::max(y, sprite.y + 8);
+                const int right = std::min(x + w, sprite.x + 8 + sprite.width);
+                const int bottom = std::min(y + h, sprite.y + 8 + sprite.height);
+                if(right <= left || bottom <= top)
+                    continue;
+
+                std::vector<ShadowPiece> pieces(1, {left, top, right - left, bottom - top});
+                for(Block_t& occluder : sizable)
+                {
+                    if(occluder.Hidden || occluder.Invis || occluder.Type <= 0)
+                        continue;
+                    const int ox = camX + s_round2int(occluder.Location.X);
+                    const int oy = camY + s_round2int(occluder.Location.Y);
+                    const int ow = s_round2int(occluder.Location.Width);
+                    const int oh = s_round2int(occluder.Location.Height);
+                    if(ow <= 0 || oh <= 0 || ox >= right || oy >= bottom ||
+                       ox + ow <= left || oy + oh <= top)
+                        continue;
+
+                    std::vector<ShadowPiece> visible;
+                    visible.reserve(pieces.size() * 2);
+                    for(const ShadowPiece& p : pieces)
+                    {
+                        const int l = std::max(p.x, ox);
+                        const int t = std::max(p.y, oy);
+                        const int r = std::min(p.x + p.w, ox + ow);
+                        const int b = std::min(p.y + p.h, oy + oh);
+                        if(l >= r || t >= b)
+                        {
+                            visible.push_back(p);
+                            continue;
+                        }
+                        // Four non-overlapping strips around the foreground
+                        // block. Receiver texture offsets are recovered below.
+                        if(t > p.y)
+                            visible.push_back({p.x, p.y, p.w, t - p.y});
+                        if(b < p.y + p.h)
+                            visible.push_back({p.x, b, p.w, p.y + p.h - b});
+                        if(l > p.x)
+                            visible.push_back({p.x, t, l - p.x, b - t});
+                        if(r < p.x + p.w)
+                            visible.push_back({r, t, p.x + p.w - r, b - t});
+                    }
+                    pieces.swap(visible);
+                    if(pieces.empty())
+                        break;
+                }
+                for(const ShadowPiece& p : pieces)
+                    drawReceiverShadow(sprite, p.x, p.y, p.w, p.h,
+                                       receiver, p.x - x, srcY + p.y - y, shadow);
+            }
         }
 
         for(Block_t& block : sizable)
