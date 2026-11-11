@@ -10,6 +10,7 @@ namespace VisualFXExperiment
         int src_x, src_y;
         // Physical contact bounds, separate from the animated sprite's pixels.
         bool is_actor;
+        bool is_player;
         double feet_x, feet_y, feet_width, vertical_speed;
         double resting_speed;
         int standing_block_id;
@@ -20,13 +21,14 @@ namespace VisualFXExperiment
                           int screenWidth, int screenHeight,
                           const Location_t* actorLocation = nullptr,
                           double restingSpeed = 0.0,
-                          int standingBlockId = 0)
+                          int standingBlockId = 0,
+                          bool isPlayer = false)
     {
         if(width <= 0 || height <= 0 || x > screenWidth + 64 || y > screenHeight + 64 ||
            x + width < -64 || y + height < -64)
             return;
         Sprite sprite = {&texture, x, y, width, height, srcX, srcY,
-                         actorLocation != nullptr, 0.0, 0.0, 0.0, 0.0, restingSpeed,
+                         actorLocation != nullptr, isPlayer, 0.0, 0.0, 0.0, 0.0, restingSpeed,
                          standingBlockId};
         if(actorLocation)
         {
@@ -63,7 +65,7 @@ namespace VisualFXExperiment
                       camY + s_round2int(p.Location.Y) + pfrOffY(tx, p),
                       pfrW(tx, p), pfrH(tx, p), pfrX(tx, p), pfrY(tx, p),
                       screenWidth, screenHeight,
-                      &p.Location, Physics.PlayerGravity, p.shadowStandingBlock);
+                      &p.Location, Physics.PlayerGravity, p.shadowStandingBlock, true);
         }
 
         // NPCs include vines and enemies: use the engine's current animation frame.
@@ -170,7 +172,7 @@ namespace VisualFXExperiment
 
             // Players use the actual collision ID above; they shouldn't fall back
             // to height guesses after a jump or after NPC-based collisions.
-            if(sprite.resting_speed == Physics.PlayerGravity)
+            if(sprite.is_player)
                 continue;
 
             // NPCs: near-exact contact with a sizable's upper surface and no
