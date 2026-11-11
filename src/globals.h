@@ -275,6 +275,7 @@ struct NPC_t
     int shadowStandingBlock = 0;
     // Experimental multiplayer power-up fan-out, inactive for ordinary NPCs.
     double multiplayerPowerupTargetX = 0.0;
+    double multiplayerPowerupOriginX = 0.0;
     bool multiplayerPowerupEmerging = false;
     bool multiplayerLeafPop = false;
 
