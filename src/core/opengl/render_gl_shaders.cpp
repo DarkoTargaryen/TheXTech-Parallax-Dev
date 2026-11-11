@@ -108,6 +108,39 @@ void main()
 }
 )RAW";
 
+const char* const RenderGL::s_es2_masked_shadow_frag_src =
+R"RAW(#version 100
+precision mediump float;
+varying vec2 v_texcoord;
+varying vec4 v_tint;
+uniform sampler2D u_texture;
+uniform sampler2D u_mask;
+uniform sampler2D u_receiver_mask;
+uniform sampler2D u_caster_mask;
+uniform vec4 u_receiver_map;
+uniform int u_has_receiver_mask;
+uniform int u_has_caster_mask;
+void main()
+{
+    vec2 receiverUV = v_texcoord * u_receiver_map.xy + u_receiver_map.zw;
+    float casterA = texture2D(u_texture, v_texcoord).a;
+    float receiverA = texture2D(u_mask, receiverUV).a;
+    if(u_has_caster_mask != 0)
+    {
+        vec3 m = texture2D(u_caster_mask, v_texcoord).rgb;
+        casterA *= 1.0 - (m.r + m.g + m.b) / 3.0;
+    }
+    if(u_has_receiver_mask != 0)
+    {
+        vec3 m = texture2D(u_receiver_mask, receiverUV).rgb;
+        receiverA *= 1.0 - (m.r + m.g + m.b) / 3.0;
+    }
+    if(casterA < 0.03137 || receiverA < 0.03137)
+        discard;
+    gl_FragColor = vec4(v_tint.rgb, v_tint.a * casterA * receiverA);
+}
+)RAW";
+
 const char* const RenderGL::s_es2_no_tint_frag_src =
 R"RAW(#version 100
 precision mediump float;
