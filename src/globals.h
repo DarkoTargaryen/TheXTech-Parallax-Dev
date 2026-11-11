@@ -273,6 +273,10 @@ struct NPC_t
     vbint_t tempBlock = 0;
     // Visual effect only: actual sizable ground selected by NPCBlockLogic.
     int shadowStandingBlock = 0;
+    // Experimental multiplayer power-up fan-out, inactive for ordinary NPCs.
+    double multiplayerPowerupTargetX = 0.0;
+    bool multiplayerPowerupEmerging = false;
+    bool multiplayerLeafPop = false;
 
 //    Active As Boolean 'If on screen
     bool Active = false;
