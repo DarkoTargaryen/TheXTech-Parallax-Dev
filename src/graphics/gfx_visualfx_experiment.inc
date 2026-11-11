@@ -753,29 +753,72 @@ namespace VisualFXExperiment
 
             for(const Sprite& sprite : sprites)
             {
+                // Only reflect pixels that are actually ABOVE the waterline.
+                // Previously, underwater pixels were mirrored back through the
+                // surface, causing characters to overlap their own reflection.
+                const int visibleBottom = std::min(wy, sprite.y + sprite.height);
+                if(visibleBottom <= sprite.y)
+                    continue;
+
+                int groupTop = sprite.y;
+                int groupBottom = sprite.y + sprite.height;
+                if(sprite.is_actor)
+                {
+                    // Rider and mount are separate textures with the same
+                    // physical actor bounds. Fade/clip them as ONE silhouette
+                    // (shoe, Yoshi, clown car), not as independent sprites.
+                    for(const Sprite& part : sprites)
+                    {
+                        if(!part.is_actor || part.is_player != sprite.is_player ||
+                           part.feet_x != sprite.feet_x || part.feet_y != sprite.feet_y ||
+                           part.feet_width != sprite.feet_width)
+                            continue;
+                        groupTop = std::min(groupTop, part.y);
+                        groupBottom = std::max(groupBottom, part.y + part.height);
+                    }
+                }
+
+                double submersionFade = 1.0;
+                if(groupBottom > wy)
+                {
+                    const int groupHeight = std::max(1, groupBottom - groupTop);
+                    const double submerged = std::min(1.0,
+                        double(groupBottom - wy) / groupHeight);
+                    submersionFade = 1.0 - submerged;
+                }
+                if(submersionFade <= 0.0)
+                    continue;
+
                 Sprite mirrored = sprite;
-                mirrored.y = 2 * wy - (sprite.y + sprite.height);
-                const int startY = std::max(wy, mirrored.y);
+                mirrored.height = visibleBottom - sprite.y;
+                mirrored.y = 2 * wy - visibleBottom;
+
+                int startY = std::max(wy, mirrored.y);
+                // Ensure a submerged actor is drawn above its own reflection.
+                // This applies to the entire visible mount/rider silhouette.
+                if(sprite.is_actor)
+                    startY = std::max(startY, groupBottom);
                 const int endY = std::min(wy + wh, mirrored.y + mirrored.height);
                 if(startY >= endY)
                     continue;
 
-                // Reflected water image: subtle moving horizontal distortion
-                // and depth-dependent alpha. The original caster stays intact.
-                // Four-pixel strips avoid disrupting pixel-art filtering.
+                // Preserve existing pixel-aligned ripples and the depth fade.
                 for(int stripY = startY; stripY < endY; stripY += 4)
                 {
                     const int stripH = std::min(4, endY - stripY);
                     const int depth = stripY - wy;
-                    const double fade = std::max(0.0, 1.0 - depth / 112.0);
-                    if(fade <= 0.0)
+                    const double depthFade = std::max(0.0, 1.0 - depth / 112.0);
+                    if(depthFade <= 0.0)
                         break;
                     const double phase = depth * 0.19 + CommonFrame * 0.055;
                     const int shift = s_round2int(std::sin(phase) * 2.0);
                     Sprite rippled = mirrored;
                     rippled.x += shift;
+                    const int opacity = s_round2int(110 * depthFade * submersionFade);
+                    if(opacity <= 0)
+                        continue;
                     drawClipped(rippled, wx, stripY, ww, stripH, true,
-                                XTColor(155, 195, 220, static_cast<uint8_t>(110 * fade)));
+                                XTColor(155, 195, 220, static_cast<uint8_t>(opacity)));
                 }
             }
         }
