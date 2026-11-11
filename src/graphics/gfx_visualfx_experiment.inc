@@ -8,16 +8,31 @@ namespace VisualFXExperiment
         StdPicture* texture;
         int x, y, width, height;
         int src_x, src_y;
+        // Physical contact bounds, separate from the animated sprite's pixels.
+        bool is_actor;
+        double feet_x, feet_y, feet_width, vertical_speed;
+        double resting_speed;
     };
 
     static void addSprite(std::vector<Sprite>& out, StdPicture& texture,
                           int x, int y, int width, int height, int srcX, int srcY,
-                          int screenWidth, int screenHeight)
+                          int screenWidth, int screenHeight,
+                          const Location_t* actorLocation = nullptr,
+                          double restingSpeed = 0.0)
     {
         if(width <= 0 || height <= 0 || x > screenWidth + 64 || y > screenHeight + 64 ||
            x + width < -64 || y + height < -64)
             return;
-        out.push_back({&texture, x, y, width, height, srcX, srcY});
+        Sprite sprite = {&texture, x, y, width, height, srcX, srcY,
+                         actorLocation != nullptr, 0.0, 0.0, 0.0, 0.0, restingSpeed};
+        if(actorLocation)
+        {
+            sprite.feet_x = actorLocation->X;
+            sprite.feet_y = actorLocation->Y + actorLocation->Height;
+            sprite.feet_width = actorLocation->Width;
+            sprite.vertical_speed = actorLocation->SpeedY;
+        }
+        out.push_back(sprite);
     }
 
     static void collectSprites(const int camX, const int camY,
@@ -44,7 +59,8 @@ namespace VisualFXExperiment
                       camX + s_round2int(p.Location.X) + pfrOffX(tx, p),
                       camY + s_round2int(p.Location.Y) + pfrOffY(tx, p),
                       pfrW(tx, p), pfrH(tx, p), pfrX(tx, p), pfrY(tx, p),
-                      screenWidth, screenHeight);
+                      screenWidth, screenHeight,
+                      &p.Location, Physics.PlayerGravity);
         }
 
         // NPCs include vines and enemies: use the engine's current animation frame.
@@ -62,7 +78,8 @@ namespace VisualFXExperiment
             const int y = camY + s_round2int(npc.Location.Y) + npc->FrameOffsetY +
                 s_round2int(npc.Location.Height) - h;
             addSprite(sprites, GFXNPC[npc.Type], x, y, w, h,
-                      0, npc.Frame * h, screenWidth, screenHeight);
+                      0, npc.Frame * h, screenWidth, screenHeight,
+                      &npc.Location, Physics.NPCGravityReal);
         }
 
         // Ordinary blocks cast shadows but do not receive them.
@@ -127,6 +144,43 @@ namespace VisualFXExperiment
                             const std::vector<BlockRef_t>& sizable)
     {
         const XTColor shadow(16, 20, 29, 100);
+
+        // Find the *current* supporting sizeable block per actor every frame.
+        // Do not retain previous supports: on jump/fall, shadows return immediately.
+        // Compare physical feet (not sprite art) with the upper surface of the block.
+        // A character standing on an SMBX platform can have gravity-sized SpeedY.
+        std::vector<const Block_t*> supportingBlock(sprites.size(), nullptr);
+        for(size_t i = 0; i < sprites.size(); ++i)
+        {
+            const Sprite& sprite = sprites[i];
+            if(!sprite.is_actor || sprite.feet_width <= 0.0 ||
+               sprite.vertical_speed < -0.1 ||
+               sprite.vertical_speed > std::max(0.75, sprite.resting_speed + 0.25))
+                continue;
+
+            double bestDistance = 1.5;
+            double bestOverlap = 0.0;
+            for(Block_t& candidate : sizable)
+            {
+                if(candidate.Hidden || candidate.Invis || candidate.Type <= 0)
+                    continue;
+                const double yDistance = std::abs(sprite.feet_y - candidate.Location.Y);
+                const double overlap = std::min(sprite.feet_x + sprite.feet_width,
+                                                candidate.Location.X + candidate.Location.Width)
+                                     - std::max(sprite.feet_x, candidate.Location.X);
+                if(yDistance > 1.5 || overlap <= 0.0)
+                    continue;
+                if(!supportingBlock[i] || yDistance < bestDistance - 0.01 ||
+                   (std::abs(yDistance - bestDistance) <= 0.01 && overlap > bestOverlap))
+                {
+                    supportingBlock[i] = &candidate;
+                    bestDistance = yDistance;
+                    bestOverlap = overlap;
+                }
+            }
+        }
+
+        // BGOs are independent receivers, so they still receive actor shadows.
         // BGO receivers only: water/quicksand are NEVER drawn as shadow targets.
         for(BaseRef_t ref : bgos)
         {
@@ -161,9 +215,15 @@ namespace VisualFXExperiment
                 {
                     const int tileW = std::min(32, w - tileX);
                     const int srcX = tileX == 0 ? 0 : (tileX + 32 >= w ? 64 : 32);
-                    for(const Sprite& sprite : sprites)
-                        drawReceiverShadow(sprite, x + tileX, y + tileY, tileW, tileH,
+                    for(size_t i = 0; i < sprites.size(); ++i)
+                    {
+                        // Only suppress the shadow on the ACTUAL supporting block.
+                        // All other sizeable blocks remain eligible receivers.
+                        if(supportingBlock[i] == &block)
+                            continue;
+                        drawReceiverShadow(sprites[i], x + tileX, y + tileY, tileW, tileH,
                                            receiver, srcX, srcY, shadow);
+                    }
                 }
             }
         }
