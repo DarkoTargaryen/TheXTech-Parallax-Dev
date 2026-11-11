@@ -4286,8 +4286,8 @@ void StealBonus()
                     else
                         Lives -= 1;
 
-                    Player[A].State = 1;
-                    Player[A].Hearts = 1;
+                    Player[A].State = 2;
+                    Player[A].Hearts = 2;
                     RespawnPlayerTo(A, B);
                     PlaySoundSpatial(SFX_DropItem, Player[B].Location);
                 }
