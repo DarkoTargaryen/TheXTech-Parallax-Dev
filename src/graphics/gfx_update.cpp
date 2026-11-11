@@ -2866,6 +2866,17 @@ void UpdateGraphicsScreen(Screen_t& screen)
             }
         }
 
+        // Experimental emissive light is a single capped screen-space pass.
+        // Draw after lava, NPCs, and effects so nearby sprites and terrain
+        // receive the light without changing the existing shadow/reflection pass.
+        if(!LevelEditor)
+        {
+            XRender::setDrawPlane(PLANE_LVL_EFF_NORM + 1);
+            VisualFXExperiment::drawEmissiveLighting(camX, camY,
+                                                     vScreen[Z].Width, vScreen[Z].Height,
+                                                     screenLavaBlocks);
+        }
+
         XRender::setDrawPlane(PLANE_LVL_INFO);
 
         // NPCs warnings
