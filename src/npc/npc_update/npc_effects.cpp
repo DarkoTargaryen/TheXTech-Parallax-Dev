@@ -32,8 +32,42 @@
 
 #include "main/trees.h"
 
+static inline void s_updateMultiplayerEmergence(NPC_t& n)
+{
+    if(!n.multiplayerPowerupEmerging)
+        return;
+
+    // Smooth fan-out, capped at five pixels per frame. Items emerge from
+    // one opening but separate before their full sprites become visible.
+    const double delta = n.multiplayerPowerupTargetX - n.Location.X;
+    n.Location.X += std::max(-5.0, std::min(5.0, delta));
+}
+
+static inline void s_finishMultiplayerEmergence(NPC_t& n)
+{
+    if(!n.multiplayerPowerupEmerging)
+        return;
+    n.multiplayerPowerupEmerging = false;
+    if(n.multiplayerLeafPop)
+    {
+        // A lively upward pop that transitions into native leaf flutter AI.
+        n.Location.SpeedY = -7.5;
+        const double delta = n.multiplayerPowerupTargetX - n.Location.X;
+        n.Location.SpeedX = (delta < 0 ? -1.3 : 1.3);
+        n.Direction = (delta < 0 ? -1 : 1);
+        n.Special = 0;
+        n.multiplayerLeafPop = false;
+    }
+}
+
 static inline void NPCEffectLogic_EmergeUp(int A)
 {
+    if(NPC[A].multiplayerPowerupEmerging && NPC[A].Effect2 < 0)
+    {
+        ++NPC[A].Effect2;
+        return;
+    }
+    s_updateMultiplayerEmergence(NPC[A]);
     if(NPC[A].Direction == 0.0f) // Move toward the closest player
     {
         double C = 0;
@@ -62,6 +96,7 @@ static inline void NPCEffectLogic_EmergeUp(int A)
         {
             NPC[A].Effect = NPCEFF_NORMAL;
             NPC[A].Effect2 = 0;
+            s_finishMultiplayerEmergence(NPC[A]);
             NPC[A].Location.Y += NPC[A].Location.Height;
             NPC[A].Location.Height = NPC[A]->THeight;
             NPC[A].Location.Y += -NPC[A].Location.Height;
@@ -73,6 +108,7 @@ static inline void NPCEffectLogic_EmergeUp(int A)
         {
             NPC[A].Effect = NPCEFF_NORMAL;
             NPC[A].Effect2 = 0;
+            s_finishMultiplayerEmergence(NPC[A]);
             NPC[A].Location.Height = NPC[A]->THeight;
         }
     }
@@ -80,6 +116,12 @@ static inline void NPCEffectLogic_EmergeUp(int A)
 
 static inline void NPCEffectLogic_EmergeDown(int A)
 {
+    if(NPC[A].multiplayerPowerupEmerging && NPC[A].Effect2 < 0)
+    {
+        ++NPC[A].Effect2;
+        return;
+    }
+    s_updateMultiplayerEmergence(NPC[A]);
     if(NPC[A].Type == NPCID_LEAF_POWER)
         NPC[A].Direction = 1;
     else if(NPC[A].Direction == 0.f) // Move toward the closest player
@@ -106,6 +148,7 @@ static inline void NPCEffectLogic_EmergeDown(int A)
     {
         NPC[A].Effect = NPCEFF_NORMAL;
         NPC[A].Effect2 = 0;
+        s_finishMultiplayerEmergence(NPC[A]);
 
         NPC[A].Location.Height = (g_config.fix_npc_emerge_size) ? NPC[A]->THeight : 32;
 
