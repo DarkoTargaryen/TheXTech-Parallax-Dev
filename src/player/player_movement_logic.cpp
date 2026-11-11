@@ -50,7 +50,7 @@ void PlayerMovementX(int A, float& cursed_value_C)
         speedVar = 1;
 
     if(Player[A].Character == 3)
-        speedVar = (speedVar * 0.93f);
+        speedVar = (speedVar * 1.0f);
 
     if(Player[A].Character == 4)
         speedVar = (speedVar * 1.07f);
