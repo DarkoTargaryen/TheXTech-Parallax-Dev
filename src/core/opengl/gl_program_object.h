@@ -214,17 +214,8 @@ public:
      * \brief Reports whether there is a valid program stored in the object
      */
     inline GLuint program_id() const { return m_program; }
-    // Resolve shader uniforms through the engine's translator naming convention.
-    // ANGLE-translated GLSL names have an internal prefix on desktop OpenGL.
-    inline GLint named_uniform_location(const char* name)
-    {
-#ifdef RENDERGL_HAS_SHADERS
-        return glGetUniformLocation(m_program, m_map_var(name));
-#else
-        (void)name;
-        return -1;
-#endif
-    }
+    // Resolve shader uniforms via ANGLE-aware mapping (implemented in OpenGL cpp).
+    GLint named_uniform_location(const char* name);
 
 
     inline bool inited() const
