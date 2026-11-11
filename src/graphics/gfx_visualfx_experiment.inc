@@ -85,7 +85,7 @@ namespace VisualFXExperiment
                 s_round2int(npc.Location.Height) - h;
             addSprite(sprites, GFXNPC[npc.Type], x, y, w, h,
                       0, npc.Frame * h, screenWidth, screenHeight,
-                      &npc.Location, Physics.NPCGravityReal);
+                      &npc.Location, Physics.NPCGravityReal, npc.shadowStandingBlock);
         }
 
         // Ordinary blocks cast shadows but do not receive them.
