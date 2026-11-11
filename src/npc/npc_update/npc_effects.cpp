@@ -39,10 +39,12 @@ static inline void s_updateMultiplayerEmergence(NPC_t& n)
     if(!n.multiplayerPowerupEmerging)
         return;
 
-    // Smooth fan-out, capped at five pixels per frame. Items emerge from
-    // one opening but separate before their full sprites become visible.
+    // First rise visibly out of the SAME block. Only begin fanning out
+    // once most of the sprite has emerged, like a small fountain.
+    if(n.Effect2 < 22)
+        return;
     const double delta = n.multiplayerPowerupTargetX - n.Location.X;
-    n.Location.X += std::max(-5.0, std::min(5.0, delta));
+    n.Location.X += std::max(-4.0, std::min(4.0, delta));
 }
 
 static inline void s_finishMultiplayerEmergence(NPC_t& n)
@@ -54,7 +56,7 @@ static inline void s_finishMultiplayerEmergence(NPC_t& n)
     {
         // A lively upward pop that transitions into native leaf flutter AI.
         n.Location.SpeedY = -7.5;
-        const double delta = n.multiplayerPowerupTargetX - n.Location.X;
+        const double delta = n.multiplayerPowerupTargetX - n.multiplayerPowerupOriginX;
         n.Location.SpeedX = (delta < 0 ? -1.3 : 1.3);
         n.Direction = (delta < 0 ? -1 : 1);
         n.Special = 0;
@@ -69,7 +71,21 @@ static inline void NPCEffectLogic_EmergeUp(int A)
         ++NPC[A].Effect2;
         return;
     }
-    s_updateMultiplayerEmergence(NPC[A]);
+    // Once fully above the block, stay at that height while finishing
+    // the sideways spread. Do not keep stretching the emergence sprite.
+    if(NPC[A].multiplayerPowerupEmerging)
+    {
+        const int emergeHeight = (NPC[A]->HeightGFX > 0)
+            ? NPC[A]->HeightGFX : NPC[A]->THeight;
+        if(NPC[A].Effect2 >= emergeHeight)
+        {
+            s_updateMultiplayerEmergence(NPC[A]);
+            if(std::abs(NPC[A].multiplayerPowerupTargetX - NPC[A].Location.X) > 0.5)
+                return;
+        }
+        else
+            s_updateMultiplayerEmergence(NPC[A]);
+    }
     if(NPC[A].Direction == 0.0f) // Move toward the closest player
     {
         double C = 0;
@@ -96,6 +112,9 @@ static inline void NPCEffectLogic_EmergeUp(int A)
     {
         if(NPC[A].Effect2 >= NPC[A]->HeightGFX)
         {
+            if(NPC[A].multiplayerPowerupEmerging &&
+               std::abs(NPC[A].multiplayerPowerupTargetX - NPC[A].Location.X) > 0.5)
+                return;
             NPC[A].Effect = NPCEFF_NORMAL;
             NPC[A].Effect2 = 0;
             s_finishMultiplayerEmergence(NPC[A]);
@@ -108,6 +127,9 @@ static inline void NPCEffectLogic_EmergeUp(int A)
     {
         if(NPC[A].Effect2 >= NPC[A]->THeight)
         {
+            if(NPC[A].multiplayerPowerupEmerging &&
+               std::abs(NPC[A].multiplayerPowerupTargetX - NPC[A].Location.X) > 0.5)
+                return;
             NPC[A].Effect = NPCEFF_NORMAL;
             NPC[A].Effect2 = 0;
             s_finishMultiplayerEmergence(NPC[A]);
@@ -126,6 +148,9 @@ static inline void NPCEffectLogic_EmergeDown(int A)
     if(NPC[A].multiplayerPowerupEmerging && NPC[A].Location.Height == 0)
         NPC[A].Location.Height = NPC[A]->THeight;
     s_updateMultiplayerEmergence(NPC[A]);
+    if(NPC[A].multiplayerPowerupEmerging && NPC[A].Effect2 >= 32 &&
+       std::abs(NPC[A].multiplayerPowerupTargetX - NPC[A].Location.X) > 0.5)
+        return;
     if(NPC[A].Type == NPCID_LEAF_POWER)
         NPC[A].Direction = 1;
     else if(NPC[A].Direction == 0.f) // Move toward the closest player
@@ -148,7 +173,7 @@ static inline void NPCEffectLogic_EmergeDown(int A)
     NPC[A].Effect2 += 1;
     NPC[A].Location.Y += 1;
 
-    if(NPC[A].Effect2 == 32)
+    if(NPC[A].Effect2 >= 32)
     {
         NPC[A].Effect = NPCEFF_NORMAL;
         NPC[A].Effect2 = 0;
