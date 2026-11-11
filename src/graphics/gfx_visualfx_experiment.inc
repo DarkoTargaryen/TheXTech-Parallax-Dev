@@ -14,6 +14,7 @@ namespace VisualFXExperiment
         double feet_x, feet_y, feet_width, vertical_speed;
         double resting_speed;
         int standing_block_id;
+        bool grabbing_item;
     };
 
     static void addSprite(std::vector<Sprite>& out, StdPicture& texture,
@@ -22,14 +23,15 @@ namespace VisualFXExperiment
                           const Location_t* actorLocation = nullptr,
                           double restingSpeed = 0.0,
                           int standingBlockId = 0,
-                          bool isPlayer = false)
+                          bool isPlayer = false,
+                          bool grabbingItem = false)
     {
         if(width <= 0 || height <= 0 || x > screenWidth + 64 || y > screenHeight + 64 ||
            x + width < -64 || y + height < -64)
             return;
         Sprite sprite = {&texture, x, y, width, height, srcX, srcY,
                          actorLocation != nullptr, isPlayer, 0.0, 0.0, 0.0, 0.0, restingSpeed,
-                         standingBlockId};
+                         standingBlockId, grabbingItem};
         if(actorLocation)
         {
             sprite.feet_x = actorLocation->X;
@@ -56,6 +58,7 @@ namespace VisualFXExperiment
             const Player_t& p = Player[A];
             if(p.Dead || p.TimeToLive || p.Immune2 || p.Character < 1 || p.Character > 5 ||
                p.State < 1 || p.State > 10 || p.Effect == PLREFF_WARP_PIPE ||
+               p.Effect == PLREFF_WARP_DOOR || p.Effect == PLREFF_NO_COLLIDE ||
                p.Effect == PLREFF_WAITING || p.Effect == PLREFF_PET_INSIDE)
                 continue;
 
@@ -65,7 +68,8 @@ namespace VisualFXExperiment
                       camY + s_round2int(p.Location.Y) + pfrOffY(tx, p),
                       pfrW(tx, p), pfrH(tx, p), pfrX(tx, p), pfrY(tx, p),
                       screenWidth, screenHeight,
-                      &p.Location, Physics.PlayerGravity, p.shadowStandingBlock, true);
+                      &p.Location, Physics.PlayerGravity, p.shadowStandingBlock, true,
+                      p.GrabTime > 0);
         }
 
         // NPCs include vines and enemies: use the engine's current animation frame.
@@ -164,16 +168,49 @@ namespace VisualFXExperiment
             if(sprite.standing_block_id > 0 && sprite.standing_block_id <= numBlock)
             {
                 const Block_t& support = Block[sprite.standing_block_id];
-                if(!support.Hidden && !support.Invis &&
-                   BlockIsSizable[support.Type])
+                const double overlap = std::min(sprite.feet_x + sprite.feet_width,
+                                                support.Location.X + support.Location.Width)
+                                     - std::max(sprite.feet_x, support.Location.X);
+                // Confirm that the cached grab support is still under the actor.
+                // Most frames this ID was freshly selected by the physics engine.
+                const double delta = sprite.feet_y - support.Location.Y;
+                if(support.Type > 0 && !support.Hidden && !support.Invis &&
+                   BlockIsSizable[support.Type] && overlap > 0.0 &&
+                   (sprite.grabbing_item ? (delta >= -4.0 && delta <= 32.0)
+                                         : std::abs(delta) <= 4.0))
                     supportingBlock[i] = &support;
-                continue;
             }
 
-            // Players use the actual collision ID above; they shouldn't fall back
-            // to height guesses after a jump or after NPC-based collisions.
-            if(sprite.is_player)
+            if(supportingBlock[i])
                 continue;
+
+            // During an NPC 91 pickup, the actor may be animated a little below
+            // the surface with no floor collision. Allow that specific animation
+            // to find its support, but never infer player support while airborne.
+            if(sprite.is_player && !sprite.grabbing_item)
+                continue;
+
+            if(sprite.is_player && sprite.grabbing_item)
+            {
+                double closest = 33.0;
+                for(Block_t& candidate : sizable)
+                {
+                    if(candidate.Hidden || candidate.Invis || candidate.Type <= 0)
+                        continue;
+                    const double delta = sprite.feet_y - candidate.Location.Y;
+                    const double overlap = std::min(sprite.feet_x + sprite.feet_width,
+                                                    candidate.Location.X + candidate.Location.Width)
+                                         - std::max(sprite.feet_x, candidate.Location.X);
+                    if(delta < -4.0 || delta > 32.0 || overlap <= 0.0)
+                        continue;
+                    if(!supportingBlock[i] || std::abs(delta) < closest)
+                    {
+                        supportingBlock[i] = &candidate;
+                        closest = std::abs(delta);
+                    }
+                }
+                continue;
+            }
 
             // NPCs: near-exact contact with a sizable's upper surface and no
             // upward movement. Allow grounded NPC velocity to be 0 or gravity.
@@ -242,7 +279,18 @@ namespace VisualFXExperiment
                     {
                         // Only suppress the shadow on the ACTUAL supporting block.
                         // All other sizeable blocks remain eligible receivers.
-                        if(supportingBlock[i] == &block)
+                        const Block_t* support = supportingBlock[i];
+                        if(support == &block)
+                            continue;
+                        // Multiple resizables may form a single visible floor.
+                        // Suppress actor shadows on every same-height segment
+                        // the actor is currently touching; retain higher/lower
+                        // receivers behind them as usual.
+                        if(support && sprites[i].is_actor &&
+                           std::abs(support->Location.Y - block.Location.Y) <= 1.5 &&
+                           std::min(sprites[i].feet_x + sprites[i].feet_width,
+                                    block.Location.X + block.Location.Width) >
+                           std::max(sprites[i].feet_x, block.Location.X))
                             continue;
                         drawReceiverShadow(sprites[i], x + tileX, y + tileY, tileW, tileH,
                                            receiver, srcX, srcY, shadow);
