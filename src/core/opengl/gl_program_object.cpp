@@ -241,6 +241,11 @@ const char* GLProgramObject::m_map_var(const char* variable)
     return s_temp_string.c_str();
 }
 
+GLint GLProgramObject::named_uniform_location(const char* name)
+{
+    return m_program ? glGetUniformLocation(m_program, m_map_var(name)) : -1;
+}
+
 void GLProgramObject::m_update_transform(const GLfloat* transform, const GLfloat* read_viewport, GLfloat clock)
 {
     if(m_u_transform_loc != -1)
@@ -447,6 +452,12 @@ void GLProgramObject::m_clear_uniform_steps()
 /**********************
  *** Public methods ***
  **********************/
+
+GLint GLProgramObject::named_uniform_location(const char* name)
+{
+    (void)name;
+    return -1;
+}
 
 GLProgramObject::GLProgramObject()
 {
