@@ -403,6 +403,16 @@ void UpdatePlayer()
                 int MessageNPC = 0;
                 PlayerNPCLogic(A, tempSpring, tempShell, MessageNPC, movingBlock, floorBlock, oldSpeedY);
 
+                // Share the actual floor collision with the visual shadow pass.
+                // Positive floorBlock is the platform selected by game physics.
+                // A buried item (NPC 91) can change speed/position without
+                // invalidating the underlying block selected as the floor.
+                if(floorBlock > 0 && floorBlock <= numBlock &&
+                   BlockIsSizable[Block[floorBlock].Type] &&
+                   !Block[floorBlock].Hidden && !Block[floorBlock].Invis &&
+                   Player[A].Location.SpeedY >= -0.01)
+                    Player[A].shadowStandingBlock = floorBlock;
+
                 // reduce player's multiplier
                 if((Player[A].Location.SpeedY == 0 || Player[A].StandingOnNPC != 0 || Player[A].Slope > 0) && !Player[A].Slide && !FreezeNPCs)
                     Player[A].Multiplier = 0;
