@@ -165,6 +165,8 @@ private:
         GLProgramObject* program = nullptr;
         int uniform_step = 0;
         StdPicture* texture = nullptr;
+        StdPicture* shadow_receiver = nullptr;
+        std::array<GLfloat, 4> shadow_receiver_map{{0.f, 0.f, 0.f, 0.f}};
 
         constexpr DrawContext_t(std::nullptr_t)
             : program(nullptr), uniform_step(0), texture(nullptr) {}
@@ -175,14 +177,19 @@ private:
         inline DrawContext_t(GLProgramObject& program, StdPicture* texture)
             : program(&program), uniform_step(program.get_uniform_step()), texture(texture) {}
 
-        constexpr bool operator==(const DrawContext_t& o) const noexcept
+        bool operator==(const DrawContext_t& o) const noexcept
         {
-            return texture == o.texture && program == o.program && uniform_step == o.uniform_step;
+            return texture == o.texture && program == o.program && uniform_step == o.uniform_step
+                    && shadow_receiver == o.shadow_receiver && shadow_receiver_map == o.shadow_receiver_map;
         }
 
-        constexpr bool operator<(const DrawContext_t& o) const noexcept
+        bool operator<(const DrawContext_t& o) const noexcept
         {
-            return (program == o.program && uniform_step == o.uniform_step && texture < o.texture) || program < o.program || (program == o.program && uniform_step < o.uniform_step);
+            if(program != o.program) return program < o.program;
+            if(uniform_step != o.uniform_step) return uniform_step < o.uniform_step;
+            if(texture != o.texture) return texture < o.texture;
+            if(shadow_receiver != o.shadow_receiver) return shadow_receiver < o.shadow_receiver;
+            return shadow_receiver_map < o.shadow_receiver_map;
         }
     };
 
@@ -193,7 +200,13 @@ private:
     {
         std::size_t operator()(const RenderGL::DrawContext_t& c) const noexcept
         {
-            return std::hash<GLProgramObject*>()(c.program) ^ (std::hash<StdPicture*>()(c.texture) >> 1) ^ (std::hash<int>()(c.uniform_step) >> 2);
+            std::size_t h = std::hash<GLProgramObject*>()(c.program) ^
+                (std::hash<StdPicture*>()(c.texture) >> 1) ^
+                (std::hash<int>()(c.uniform_step) >> 2) ^
+                (std::hash<StdPicture*>()(c.shadow_receiver) >> 3);
+            for(float f : c.shadow_receiver_map)
+                h = h * 31u + std::hash<float>()(f);
+            return h;
         }
     };
 
@@ -364,6 +377,7 @@ private:
     GLProgramObject m_standard_program;
     GLProgramObject m_no_tint_program;
     GLProgramObject m_bitmask_program;
+    GLProgramObject m_masked_shadow_program;
     GLProgramObject m_output_program;
     GLProgramObject m_program_rect_filled;
     GLProgramObject m_program_rect_unfilled;
@@ -412,6 +426,7 @@ private:
     static const char* const s_es2_standard_frag_src;
     static const char* const s_es2_no_tint_frag_src;
     static const char* const s_es2_bitmask_frag_src;
+    static const char* const s_es2_masked_shadow_frag_src;
     static const char* const s_es3_bitmask_frag_src;
 
     static const char* const s_es2_rect_filled_frag_src;
@@ -740,7 +755,11 @@ public:
 
 
 
-    // Draw texture
+    // OpenGL: draw caster silhouette only on opaque pixels of the receiver.
+    void renderMaskedShadow(int x, int y, int w, int h,
+                            StdPicture& caster, int casterSrcX, int casterSrcY,
+                            StdPicture& receiver, int receiverSrcX, int receiverSrcY,
+                            XTColor tint) override;
 
     void renderTextureScaleEx(double xDst, double yDst, double wDst, double hDst,
                               StdPicture &tx,
