@@ -453,12 +453,6 @@ void GLProgramObject::m_clear_uniform_steps()
  *** Public methods ***
  **********************/
 
-GLint GLProgramObject::named_uniform_location(const char* name)
-{
-    (void)name;
-    return -1;
-}
-
 GLProgramObject::GLProgramObject()
 {
     // empty
