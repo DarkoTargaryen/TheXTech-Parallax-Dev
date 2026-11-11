@@ -148,6 +148,45 @@ namespace VisualFXExperiment
                                     receiverSrcY + t - ry, tint);
     }
 
+    // Draw the receiving tile except for the screen rectangle hidden behind
+    // an actor's supporting front resizable. We split the tile into four
+    // non-overlapping strips; the existing shader still handles PNG/GIF alpha.
+    // Receiver source offsets must follow the clipped destination exactly.
+    static void drawReceiverShadowOutsideRect(const Sprite& sprite,
+                                              int rx, int ry, int rw, int rh,
+                                              StdPicture& receiver, int receiverSrcX,
+                                              int receiverSrcY, XTColor tint,
+                                              int coverX, int coverY,
+                                              int coverW, int coverH)
+    {
+        const int x0 = std::max(rx, coverX);
+        const int y0 = std::max(ry, coverY);
+        const int x1 = std::min(rx + rw, coverX + coverW);
+        const int y1 = std::min(ry + rh, coverY + coverH);
+        if(x0 >= x1 || y0 >= y1)
+        {
+            drawReceiverShadow(sprite, rx, ry, rw, rh, receiver,
+                               receiverSrcX, receiverSrcY, tint);
+            return;
+        }
+
+        // Upper and lower strips cover the tile's full width.
+        if(y0 > ry)
+            drawReceiverShadow(sprite, rx, ry, rw, y0 - ry, receiver,
+                               receiverSrcX, receiverSrcY, tint);
+        if(y1 < ry + rh)
+            drawReceiverShadow(sprite, rx, y1, rw, ry + rh - y1, receiver,
+                               receiverSrcX, receiverSrcY + (y1 - ry), tint);
+
+        // Left and right strips are limited to the covered vertical span.
+        if(x0 > rx)
+            drawReceiverShadow(sprite, rx, y0, x0 - rx, y1 - y0, receiver,
+                               receiverSrcX, receiverSrcY + (y0 - ry), tint);
+        if(x1 < rx + rw)
+            drawReceiverShadow(sprite, x1, y0, rx + rw - x1, y1 - y0, receiver,
+                               receiverSrcX + (x1 - rx), receiverSrcY + (y0 - ry), tint);
+    }
+
     static void drawShadows(const std::vector<Sprite>& sprites,
                             int camX, int camY,
                             const std::vector<BaseRef_t>& bgos,
@@ -283,26 +322,29 @@ namespace VisualFXExperiment
                         const Block_t* support = supportingBlock[i];
                         if(support == &block)
                             continue;
-                        // Standing on a front resizable must also suppress
-                        // shadows on any large rear resizable that overlaps
-                        // that support in world space. Comparing only the top
-                        // Y coordinate fails for tall blocks behind a smaller
-                        // foreground block (the visual problem in this level).
-                        // The check is recomputed every frame; airborne actors
-                        // immediately resume casting onto those rear blocks.
+                        // Same-height touching resizables form one walking
+                        // floor, so suppress the grounded actor on both.
                         if(support && sprites[i].is_actor)
                         {
                             const bool sameLevelAdjacent =
                                 std::abs(support->Location.Y - block.Location.Y) <= 1.5 &&
                                 support->Location.X <= block.Location.X + block.Location.Width + 1.0 &&
                                 block.Location.X <= support->Location.X + support->Location.Width + 1.0;
-                            const bool overlapsSupportingBlock =
-                                support->Location.X < block.Location.X + block.Location.Width &&
-                                block.Location.X < support->Location.X + support->Location.Width &&
-                                support->Location.Y < block.Location.Y + block.Location.Height &&
-                                block.Location.Y < support->Location.Y + support->Location.Height;
-                            if(sameLevelAdjacent || overlapsSupportingBlock)
+                            if(sameLevelAdjacent)
                                 continue;
+
+                            // The tall rear resizable still receives shadows
+                            // above and beside the smaller supporting block.
+                            // Only subtract pixels the foreground block covers.
+                            const int coverX = camX + s_round2int(support->Location.X);
+                            const int coverY = camY + s_round2int(support->Location.Y);
+                            const int coverW = s_round2int(support->Location.Width);
+                            const int coverH = s_round2int(support->Location.Height);
+                            drawReceiverShadowOutsideRect(sprites[i], x + tileX, y + tileY,
+                                                          tileW, tileH, receiver,
+                                                          srcX, srcY, shadow,
+                                                          coverX, coverY, coverW, coverH);
+                            continue;
                         }
                         drawReceiverShadow(sprites[i], x + tileX, y + tileY, tileW, tileH,
                                            receiver, srcX, srcY, shadow);
