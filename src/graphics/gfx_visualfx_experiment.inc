@@ -283,18 +283,27 @@ namespace VisualFXExperiment
                         const Block_t* support = supportingBlock[i];
                         if(support == &block)
                             continue;
-                        // Multiple resizables may form a single visible floor.
-                        // Suppress actor shadows on every same-height segment
-                        // the actor is currently touching; retain higher/lower
-                        // receivers behind them as usual.
-                        if(support && sprites[i].is_actor &&
-                           std::abs(support->Location.Y - block.Location.Y) <= 1.5 &&
-                           // An adjacent platform section is still part of the
-                           // same walking surface when its edge touches the
-                           // supporting section. This avoids clipped 8px shadows.
-                           support->Location.X <= block.Location.X + block.Location.Width + 1.0 &&
-                           block.Location.X <= support->Location.X + support->Location.Width + 1.0)
-                            continue;
+                        // Standing on a front resizable must also suppress
+                        // shadows on any large rear resizable that overlaps
+                        // that support in world space. Comparing only the top
+                        // Y coordinate fails for tall blocks behind a smaller
+                        // foreground block (the visual problem in this level).
+                        // The check is recomputed every frame; airborne actors
+                        // immediately resume casting onto those rear blocks.
+                        if(support && sprites[i].is_actor)
+                        {
+                            const bool sameLevelAdjacent =
+                                std::abs(support->Location.Y - block.Location.Y) <= 1.5 &&
+                                support->Location.X <= block.Location.X + block.Location.Width + 1.0 &&
+                                block.Location.X <= support->Location.X + support->Location.Width + 1.0;
+                            const bool overlapsSupportingBlock =
+                                support->Location.X < block.Location.X + block.Location.Width &&
+                                block.Location.X < support->Location.X + support->Location.Width &&
+                                support->Location.Y < block.Location.Y + block.Location.Height &&
+                                block.Location.Y < support->Location.Y + support->Location.Height;
+                            if(sameLevelAdjacent || overlapsSupportingBlock)
+                                continue;
+                        }
                         drawReceiverShadow(sprites[i], x + tileX, y + tileY, tileW, tileH,
                                            receiver, srcX, srcY, shadow);
                     }
