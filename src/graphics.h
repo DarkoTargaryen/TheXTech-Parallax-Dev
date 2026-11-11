@@ -155,6 +155,8 @@ void UpdateGraphicsFatalAssert();
 // Public Sub DrawBackground(S As Integer, Z As Integer) 'draws the background to the screen
 // draws the background to the screen
 void DrawBackground(int S, int Z);
+// Draw optional configured parallax layers over gameplay, below the HUD.
+void DrawParallaxForeground(int S, int Z);
 
 // these were removed, and their logic is now incorporated into RenderTexturePlayer.
 
