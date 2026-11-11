@@ -4270,22 +4270,14 @@ void StealBonus()
         if(Player[A].Dead && Player[A].Effect != PLREFF_COOP_WINGS)
         {
             // find other player
-            if((g_config.modern_lives_system || Lives > 0) && LevelMacro == LEVELMACRO_OFF)
+            if(LevelMacro == LEVELMACRO_OFF)
             {
                 if(Player[A].Controls.Jump || Player[A].Controls.Run)
                 {
                     B = CheckNearestLiving(A);
 
-                    if(g_config.modern_lives_system)
-                    {
-                        g_100s--;
-
-                        if(g_100s < 0)
-                            Score = 0;
-                    }
-                    else
-                        Lives -= 1;
-
+                    // Individual multiplayer respawns are free.
+                    // Respawn as Super (big) with two hearts for heart-based characters.
                     Player[A].State = 2;
                     Player[A].Hearts = 2;
                     RespawnPlayerTo(A, B);
