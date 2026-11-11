@@ -589,7 +589,7 @@ void SetupPlayers()
             Player[A].State = 1;
         // box to hearts
 
-        if(Player[A].Character == 3 || Player[A].Character == 4 || Player[A].Character == 5) // Peach and Toad
+        if(Player[A].Character == 5) // Link keeps hearts
         {
             if(Player[A].Hearts <= 0)
                 Player[A].Hearts = 1;
@@ -763,12 +763,7 @@ void SetupPlayers()
             Player[A].CanFloat = true;
 
         if(Player[A].Character == 3 || Player[A].Character == 4)
-        {
-            if(Player[A].State == 1)
-                Player[A].Hearts = 1;
-            if(Player[A].State > 1 && Player[A].Hearts < 2)
-                Player[A].Hearts = 2;
-        }
+            Player[A].Hearts = 0;
 
         // legacy code for >2P, unused in modern gameplay
         if(numPlayers > 2 && !GameMenu) // find correct positions without start locations
@@ -979,41 +974,7 @@ void PlayerHurt(const int A)
             else
             {
                 // TODO: State-dependent moment
-                if(p.Character == 3 || p.Character == 4)
-                {
-                    if(p.Hearts == 3 && (p.State == 2 || p.State == 4 || p.State == 5 || p.State == 6))
-                    {
-                        p.State = 2;
-                        p.Immune = 150;
-                        p.Immune2 = true;
-                        p.Hearts -= 1;
-                        PlaySoundSpatial(SFX_PlayerHit, p.Location);
-                        return;
-                    }
-                    else
-                    {
-                        p.Hearts -= 1;
-                        if(p.Hearts == 0)
-                            p.State = 1;
-                        else if(p.State == 3 && p.Hearts == 2)
-                        {
-                            p.Effect = PLREFF_FIRE_TO_BIG;
-                            p.Effect2 = 0;
-                            PlaySoundSpatial(SFX_PlayerShrink, p.Location);
-                            return;
-                        }
-                        else if(p.State == 7 && p.Hearts == 2)
-                        {
-                            p.Effect = PLREFF_ICE_TO_BIG;
-                            p.Effect2 = 0;
-                            PlaySoundSpatial(SFX_PlayerShrink, p.Location);
-                            return;
-                        }
-                        else
-                            p.State = 2;
-                    }
-                }
-                else if(p.Character == 5)
+                if(p.Character == 5)
                 {
                     p.Hearts -= 1;
                     if(p.Hearts > 0)
@@ -1039,6 +1000,30 @@ void PlayerHurt(const int A)
                         PlaySoundSpatial(SFX_HeroHurt, p.Location);
                         return;
                     }
+                }
+
+                // All four SMBX characters: powered-up forms lose their special power first.
+                // A subsequent hit as Super (state 2) still shrinks to small.
+                if(p.Character >= 1 && p.Character <= 4 && p.State > 2)
+                {
+                    p.StateNPC = NPCID_NULL;
+                    PlaySoundSpatial(SFX_PlayerShrink, p.Location);
+
+                    if(p.State == 3 || p.State == 7)
+                    {
+                        // Reuse TheXTech's existing Fire/Ice -> Super animation.
+                        p.Effect = (p.State == 3) ? PLREFF_FIRE_TO_BIG : PLREFF_ICE_TO_BIG;
+                        p.Effect2 = 0;
+                    }
+                    else
+                    {
+                        // Leaf, Tanooki, Hammer: revert directly to Super.
+                        p.State = 2;
+                        p.Immune = 150;
+                        p.Immune2 = true;
+                        SizeCheck(p);
+                    }
+                    return;
                 }
 
                 if(p.State > 1)
@@ -2742,7 +2727,7 @@ void UpdatePlayerBonus(const int A, const NPCID B)
         }
     }
 
-    if(p.Character == 3 || p.Character == 4 || p.Character == 5)
+    if(p.Character == 5)
         p.HeldBonus = NPCID(0);
 }
 
@@ -4279,7 +4264,7 @@ void StealBonus()
                     // Individual multiplayer respawns are free.
                     // Respawn as Super (big) with two hearts for heart-based characters.
                     Player[A].State = 2;
-                    Player[A].Hearts = 2;
+                    Player[A].Hearts = (Player[A].Character == 5) ? 2 : 0;
                     RespawnPlayerTo(A, B);
                     PlaySoundSpatial(SFX_DropItem, Player[B].Location);
                 }
