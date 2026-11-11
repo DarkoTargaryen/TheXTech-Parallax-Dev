@@ -541,14 +541,13 @@ void RenderGL::executeOrderedDrawQueue(bool clear)
                 glActiveTexture(TEXTURE_UNIT_DEPTH_READ);
                 glBindTexture(GL_TEXTURE_2D, texture ? texture->d.mask_texture_id : 0);
                 glActiveTexture(TEXTURE_UNIT_IMAGE);
-                const GLuint programID = program->program_id();
-                const GLint mapLoc = glGetUniformLocation(programID, "u_receiver_map");
+                const GLint mapLoc = program->named_uniform_location("u_receiver_map");
                 const GLfloat* m = context.shadow_receiver_map.data();
                 glUniform4f(mapLoc, m[0], m[1], m[2], m[3]);
-                glUniform1i(glGetUniformLocation(programID, "u_receiver_mask"), 3);
-                glUniform1i(glGetUniformLocation(programID, "u_caster_mask"), 4);
-                glUniform1i(glGetUniformLocation(programID, "u_has_receiver_mask"), receiver->d.mask_texture_id ? 1 : 0);
-                glUniform1i(glGetUniformLocation(programID, "u_has_caster_mask"), texture && texture->d.mask_texture_id ? 1 : 0);
+                glUniform1i(program->named_uniform_location("u_receiver_mask"), 3);
+                glUniform1i(program->named_uniform_location("u_caster_mask"), 4);
+                glUniform1i(program->named_uniform_location("u_has_receiver_mask"), receiver->d.mask_texture_id ? 1 : 0);
+                glUniform1i(program->named_uniform_location("u_has_caster_mask"), texture && texture->d.mask_texture_id ? 1 : 0);
             }
 #endif
         }
