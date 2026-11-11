@@ -290,7 +290,16 @@ public:
 
 
 
-    // Draw texture
+    // Optional dual-texture alpha-masked shadow drawing. Other backends omit shadows.
+    virtual void renderMaskedShadow(int x, int y, int w, int h,
+                                    StdPicture& caster, int casterSrcX, int casterSrcY,
+                                    StdPicture& receiver, int receiverSrcX, int receiverSrcY,
+                                    XTColor tint)
+    {
+        (void)x; (void)y; (void)w; (void)h;
+        (void)caster; (void)casterSrcX; (void)casterSrcY;
+        (void)receiver; (void)receiverSrcX; (void)receiverSrcY; (void)tint;
+    }
 
     virtual void renderTextureScaleEx(double xDst, double yDst, double wDst, double hDst,
                               StdPicture &tx,
