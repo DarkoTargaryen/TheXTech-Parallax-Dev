@@ -288,9 +288,11 @@ namespace VisualFXExperiment
                         // receivers behind them as usual.
                         if(support && sprites[i].is_actor &&
                            std::abs(support->Location.Y - block.Location.Y) <= 1.5 &&
-                           std::min(sprites[i].feet_x + sprites[i].feet_width,
-                                    block.Location.X + block.Location.Width) >
-                           std::max(sprites[i].feet_x, block.Location.X))
+                           // An adjacent platform section is still part of the
+                           // same walking surface when its edge touches the
+                           // supporting section. This avoids clipped 8px shadows.
+                           support->Location.X <= block.Location.X + block.Location.Width + 1.0 &&
+                           block.Location.X <= support->Location.X + support->Location.Width + 1.0)
                             continue;
                         drawReceiverShadow(sprites[i], x + tileX, y + tileY, tileW, tileH,
                                            receiver, srcX, srcY, shadow);
