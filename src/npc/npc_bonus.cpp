@@ -77,13 +77,6 @@ void DropBonus(int A)
         return;
     }
 
-    // is player not meant to have a bonus?
-    if(Player[A].Character == 3 || Player[A].Character == 4)
-    {
-        Player[A].HeldBonus = NPCID(0);
-        return;
-    }
-
     // drop the bonus!
     PlaySoundSpatial(SFX_DropItem, plr.Location);
     numNPCs++;
@@ -255,7 +248,7 @@ void TouchBonus(int A, int B)
     }
 
     // give hearts to heart chars
-    if(Player[A].Character == 3 || Player[A].Character == 4 || Player[A].Character == 5)
+    if(Player[A].Character == 5)
     {
         // only the first three types were checked in SMBX 1.3, the others were moved here for simplicity
         if(NPC[B].Type == NPCID_LEAF_POWER || NPC[B].Type == NPCID_STATUE_POWER || NPC[B].Type == NPCID_HEAVY_POWER
