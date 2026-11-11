@@ -12,19 +12,22 @@ namespace VisualFXExperiment
         bool is_actor;
         double feet_x, feet_y, feet_width, vertical_speed;
         double resting_speed;
+        int standing_block_id;
     };
 
     static void addSprite(std::vector<Sprite>& out, StdPicture& texture,
                           int x, int y, int width, int height, int srcX, int srcY,
                           int screenWidth, int screenHeight,
                           const Location_t* actorLocation = nullptr,
-                          double restingSpeed = 0.0)
+                          double restingSpeed = 0.0,
+                          int standingBlockId = 0)
     {
         if(width <= 0 || height <= 0 || x > screenWidth + 64 || y > screenHeight + 64 ||
            x + width < -64 || y + height < -64)
             return;
         Sprite sprite = {&texture, x, y, width, height, srcX, srcY,
-                         actorLocation != nullptr, 0.0, 0.0, 0.0, 0.0, restingSpeed};
+                         actorLocation != nullptr, 0.0, 0.0, 0.0, 0.0, restingSpeed,
+                         standingBlockId};
         if(actorLocation)
         {
             sprite.feet_x = actorLocation->X;
@@ -60,7 +63,7 @@ namespace VisualFXExperiment
                       camY + s_round2int(p.Location.Y) + pfrOffY(tx, p),
                       pfrW(tx, p), pfrH(tx, p), pfrX(tx, p), pfrY(tx, p),
                       screenWidth, screenHeight,
-                      &p.Location, Physics.PlayerGravity);
+                      &p.Location, Physics.PlayerGravity, p.shadowStandingBlock);
         }
 
         // NPCs include vines and enemies: use the engine's current animation frame.
@@ -69,7 +72,8 @@ namespace VisualFXExperiment
                                       -camY + screenHeight + 64, SORTMODE_NONE))
         {
             const NPC_t& npc = *n;
-            if(npc.Hidden || npc.Type <= 0 || npc.Killed || !npc.Active)
+            if(npc.Hidden || npc.Type <= 0 || npc.Type == NPCID_ITEM_BURIED ||
+               npc.Killed || !npc.Active)
                 continue;
             const int w = npc->WidthGFX > 0 ? npc->WidthGFX : s_round2int(npc.Location.Width);
             const int h = npc->HeightGFX > 0 ? npc->HeightGFX : s_round2int(npc.Location.Height);
@@ -145,37 +149,54 @@ namespace VisualFXExperiment
     {
         const XTColor shadow(16, 20, 29, 100);
 
-        // Find the *current* supporting sizeable block per actor every frame.
-        // Do not retain previous supports: on jump/fall, shadows return immediately.
-        // Compare physical feet (not sprite art) with the upper surface of the block.
-        // A character standing on an SMBX platform can have gravity-sized SpeedY.
+        // Prefer the support block selected by the engine's real player collision.
+        // Recompute from live contacts for NPCs, which don't store a floorBlock.
+        // Never remember the previously touched block after leaving it.
         std::vector<const Block_t*> supportingBlock(sprites.size(), nullptr);
         for(size_t i = 0; i < sprites.size(); ++i)
         {
             const Sprite& sprite = sprites[i];
-            if(!sprite.is_actor || sprite.feet_width <= 0.0 ||
-               sprite.vertical_speed < -0.1 ||
-               sprite.vertical_speed > std::max(0.75, sprite.resting_speed + 0.25))
+            if(!sprite.is_actor || sprite.feet_width <= 0.0)
                 continue;
 
-            double bestDistance = 1.5;
-            double bestOverlap = 0.0;
+            if(sprite.standing_block_id > 0 && sprite.standing_block_id <= numBlock)
+            {
+                const Block_t& support = Block[sprite.standing_block_id];
+                if(!support.Hidden && !support.Invis &&
+                   BlockIsSizable[support.Type])
+                    supportingBlock[i] = &support;
+                continue;
+            }
+
+            // Players use the actual collision ID above; they shouldn't fall back
+            // to height guesses after a jump or after NPC-based collisions.
+            if(sprite.resting_speed == Physics.PlayerGravity)
+                continue;
+
+            // NPCs: near-exact contact with a sizable's upper surface and no
+            // upward movement. Allow grounded NPC velocity to be 0 or gravity.
+            if(sprite.vertical_speed < -0.05 ||
+               sprite.vertical_speed > std::max(1.0, sprite.resting_speed + 0.25))
+                continue;
+
+            double nearest = 2.5;
+            double widest = 0.0;
             for(Block_t& candidate : sizable)
             {
                 if(candidate.Hidden || candidate.Invis || candidate.Type <= 0)
                     continue;
-                const double yDistance = std::abs(sprite.feet_y - candidate.Location.Y);
+                const double distance = std::abs(sprite.feet_y - candidate.Location.Y);
                 const double overlap = std::min(sprite.feet_x + sprite.feet_width,
                                                 candidate.Location.X + candidate.Location.Width)
                                      - std::max(sprite.feet_x, candidate.Location.X);
-                if(yDistance > 1.5 || overlap <= 0.0)
+                if(distance > 2.5 || overlap <= 0.0)
                     continue;
-                if(!supportingBlock[i] || yDistance < bestDistance - 0.01 ||
-                   (std::abs(yDistance - bestDistance) <= 0.01 && overlap > bestOverlap))
+                if(!supportingBlock[i] || distance < nearest - 0.01 ||
+                   (std::abs(distance - nearest) <= 0.01 && overlap > widest))
                 {
                     supportingBlock[i] = &candidate;
-                    bestDistance = yDistance;
-                    bestOverlap = overlap;
+                    nearest = distance;
+                    widest = overlap;
                 }
             }
         }
