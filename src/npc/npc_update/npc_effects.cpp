@@ -18,6 +18,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <algorithm>
+
 #include "sdl_proxy/sdl_stdinc.h"
 
 #include "globals.h"
@@ -121,6 +123,8 @@ static inline void NPCEffectLogic_EmergeDown(int A)
         ++NPC[A].Effect2;
         return;
     }
+    if(NPC[A].multiplayerPowerupEmerging && NPC[A].Location.Height == 0)
+        NPC[A].Location.Height = NPC[A]->THeight;
     s_updateMultiplayerEmergence(NPC[A]);
     if(NPC[A].Type == NPCID_LEAF_POWER)
         NPC[A].Direction = 1;
