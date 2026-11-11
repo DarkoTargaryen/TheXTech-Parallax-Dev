@@ -457,6 +457,11 @@ bool RenderGL::initShaders()
         );
     }
 
+    m_masked_shadow_program = GLProgramObject(
+        s_es2_standard_vert_src,
+        s_es2_masked_shadow_frag_src
+    );
+
     m_no_tint_program = GLProgramObject(
         s_es2_standard_vert_src,
         s_es2_no_tint_frag_src
