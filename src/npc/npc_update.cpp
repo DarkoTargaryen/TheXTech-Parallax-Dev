@@ -876,6 +876,8 @@ void UpdateNPCs()
     // need this complex loop syntax because Active can be modified within it
     for(int A : NPCQueues::Active.may_insert_erase)
     {
+        // Never carry a stale visual support across frames or after a jump.
+        NPC[A].shadowStandingBlock = 0;
         if(NPC[A].AttLayer != LAYER_NONE)
         {
             lyrX = NPC[A].Location.X;
