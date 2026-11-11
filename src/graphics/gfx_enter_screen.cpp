@@ -47,6 +47,7 @@ static void initPlayers(Player_t tempPlayer[maxLocalPlayers])
         dst.Character = ref.Character;
         dst.State = ref.State;
         dst.Hearts = ref.Hearts;
+        dst.HeldBonus = ref.HeldBonus;
         dst.Mount = ref.Mount;
         dst.MountType = ref.MountType;
 
@@ -60,7 +61,7 @@ static void initPlayers(Player_t tempPlayer[maxLocalPlayers])
         if(dst.State == 0) // if no state it defaults to small mario
             dst.State = 1;
 
-        if(dst.Character == 3 || dst.Character == 4 || dst.Character == 5) // Peach and Toad
+        if(dst.Character == 5) // Link keeps hearts
         {
             if(dst.Hearts <= 0)
                 dst.Hearts = 1;
@@ -111,13 +112,7 @@ static void initPlayers(Player_t tempPlayer[maxLocalPlayers])
             dst.CanFloat = true;
 
         if(dst.Character == 3 || dst.Character == 4)
-        {
-            if(dst.State == 1)
-                dst.Hearts = 1;
-
-            if(dst.State > 1 && dst.Hearts < 2)
-                dst.Hearts = 2;
-        }
+            dst.Hearts = 0;
 
         dst.Section = -1;
 

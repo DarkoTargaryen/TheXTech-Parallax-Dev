@@ -83,7 +83,7 @@ void DrawInterface(int Z, int numScreens)
         int plr_center = left_margin + (plr_hud_width * (i * 2 + 1)) / (plr_count * 2);
 
         // show hearts
-        if(plr.Character == 3 || plr.Character == 4 || plr.Character == 5)
+        if(plr.Character == 5)
         {
             auto& heart_1_gfx = plr.Hearts > 0 ? GFX.Heart[1] : GFX.Heart[2];
             auto& heart_2_gfx = plr.Hearts > 1 ? GFX.Heart[1] : GFX.Heart[2];
