@@ -1,20 +1,11 @@
-# Shadow and reflection prototype
+# Shadow and reflection experiment — alpha-mask revision
 
-This branch is isolated from `parallax-dev` and is not a finished effect. **Do not merge** until its visuals are reviewed in-game.
-
-## Implemented in this experiment
-- Automatic silhouettes based on existing player, NPC (including vines), and ordinary block graphics.
-- Hard-edged, 8px down/right shadows, approximately 40% alpha.
-- Shadows are restricted to BGO and resizable-block rectangular bounds.
-- Transparent sprite pixels remain transparent; no graphic assets are modified.
-- Water-region reflection preview mirrors sprite textures vertically into non-quicksand water areas and clips to water bounds.
-- Shared-screen rendering uses the current camera offsets. No physics changes.
-
-## Important limitations
-- **Shadow receivers are not yet per-pixel alpha masked.** Shadows may show through transparent gaps within BGO or resizable-block sprites.
-- Sprite-based reflection does not capture all game layers, mounts, or parallax. No ripple distortion.
-- Shadows/reflections draw in the layer after normal BGOs, before standard NPC/player draws; foreground-BGO layering is incomplete.
-- Shadows from ordinary blocks are approximated from the block's sprite frame.
-- Windows CI compilation still needs checking. In-game correctness and performance have not been verified.
-
-Existing `parallax-dev` commits and Windows executables remain unchanged.
+- **Windows CI:** x64 only on the `shadow-experiment` branch. Other branches are unchanged.
+- **Shadow casters:** players, NPCs (including vines), and ordinary blocks.
+- **Shadow receivers:** background objects (BGOs) and resizable blocks only.
+- **Excluded:** normal terrain, Background2/parallax, water and quicksand never receive a shadow.
+- **Masking:** OpenGL shader intersects the caster sprite alpha/legacy GIF mask with the BGO or resizable-block PNG alpha/legacy GIF mask. No image files need editing.
+- Resizable blocks use their three-by-three tile source texture when sampling transparency.
+- Water reflections remain a separate experimental effect; quicksand is excluded from reflections.
+- If a renderer lacks the shader, it intentionally omits shadows instead of showing shadows through transparent rectangles.
+- The branch is experimental; validate x64 CI and visually test custom PNGs, GIF bitmasks, sizable blocks, foreground BGO sorting and performance before merging into `parallax-dev`.
