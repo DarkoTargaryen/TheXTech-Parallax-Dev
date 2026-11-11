@@ -1525,6 +1525,49 @@ void RenderGL::renderTextureScaleEx(double xDstD, double yDstD, double wDstD, do
     m_drawQueued = true;
 }
 
+void RenderGL::renderMaskedShadow(int x, int y, int w, int h,
+                                  StdPicture& caster, int casterSrcX, int casterSrcY,
+                                  StdPicture& receiver, int receiverSrcX, int receiverSrcY,
+                                  XTColor tint)
+{
+#ifdef RENDERGL_HAS_SHADERS
+    if(!m_use_shaders || !m_masked_shadow_program.inited() || w <= 0 || h <= 0)
+        return;
+    if(!caster.inited || !receiver.inited)
+        return;
+    if(!caster.d.texture_id && caster.l.lazyLoaded)
+        lazyLoad(caster);
+    if(!receiver.d.texture_id && receiver.l.lazyLoaded)
+        lazyLoad(receiver);
+    if(!caster.d.texture_id || !receiver.d.texture_id ||
+       caster.d.w_scale == 0.f || caster.d.h_scale == 0.f)
+        return;
+
+    RectI draw_loc(x, y, x + w, y + h);
+    RectF draw_src(casterSrcX * caster.d.w_scale,
+                   casterSrcY * caster.d.h_scale,
+                   (casterSrcX + w) * caster.d.w_scale,
+                   (casterSrcY + h) * caster.d.h_scale);
+
+    DrawContext_t context(m_masked_shadow_program, &caster);
+    context.shadow_receiver = &receiver;
+    const GLfloat scaleX = receiver.d.w_scale / caster.d.w_scale;
+    const GLfloat scaleY = receiver.d.h_scale / caster.d.h_scale;
+    context.shadow_receiver_map = {{scaleX, scaleY,
+        receiverSrcX * receiver.d.w_scale - casterSrcX * caster.d.w_scale * scaleX,
+        receiverSrcY * receiver.d.h_scale - casterSrcY * caster.d.h_scale * scaleY}};
+
+    const int16_t depth = m_render_planes.next();
+    auto& list = getOrderedDrawVertexList(context, depth);
+    addVertices(list, draw_loc, draw_src, depth, F_TO_B(tint));
+    m_drawQueued = true;
+#else
+    UNUSED(x); UNUSED(y); UNUSED(w); UNUSED(h); UNUSED(caster);
+    UNUSED(casterSrcX); UNUSED(casterSrcY); UNUSED(receiver);
+    UNUSED(receiverSrcX); UNUSED(receiverSrcY); UNUSED(tint);
+#endif
+}
+
 void RenderGL::renderTextureScale(double xDst, double yDst, double wDst, double hDst,
                                      StdPicture &tx,
                                      XTColor color)
