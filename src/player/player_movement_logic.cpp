@@ -513,7 +513,7 @@ void PlayerMovementY(int A)
 
     // handles the regular jump
     if(Player[A].Controls.Jump || (Player[A].Controls.AltJump &&
-       ((Player[A].Character > 2 && Player[A].Character != 4) || Player[A].Quicksand > 0 || g_config.disable_spin_jump) &&
+       ((Player[A].Character > 3 && Player[A].Character != 4) || Player[A].Quicksand > 0 || g_config.disable_spin_jump) &&
        Player[A].CanAltJump))
     {
         double tempSpeed;
