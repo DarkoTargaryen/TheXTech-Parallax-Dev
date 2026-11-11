@@ -595,6 +595,8 @@ double g_drawBGOs_invalidate_rate = 0;
 constexpr double i_drawBlocks_margin = 64;
 constexpr double i_drawBGOs_margin = 128;
 
+#include "gfx_visualfx_experiment.inc"
+
 // updates the lists of blocks and BGOs to draw on i'th vScreen of screen
 void s_UpdateDrawItems(Screen_t& screen, int i)
 {
@@ -2152,6 +2154,23 @@ void UpdateGraphicsScreen(Screen_t& screen)
                                       GFXBackgroundBMP[Background[A].Type],
                                       0, BackgroundHeight[Background[A].Type] * BackgroundFrame[Background[A].Type]);
             }
+        }
+
+        // Experimental effects: draw on game-space planes after low/normal BGOs
+        // and sizable blocks, before the ordinary block/NPC/player passes.
+        // This first iteration clips shadows to receiver rectangles only.
+        if(!LevelEditor)
+        {
+            static std::vector<VisualFXExperiment::Sprite> visualFXSprites;
+            VisualFXExperiment::collectSprites(camX, camY,
+                                               vScreen[Z].Width, vScreen[Z].Height,
+                                               screenMainBlocks, visualFXSprites);
+            XRender::setDrawPlane(PLANE_LVL_BGO_NORM + 2);
+            VisualFXExperiment::drawShadows(visualFXSprites, camX, camY,
+                                             screenBackgrounds, screenSBlocks);
+            XRender::setDrawPlane(PLANE_LVL_BGO_NORM + 3);
+            VisualFXExperiment::drawReflections(visualFXSprites, camX, camY,
+                                                 vScreen[Z].Width, vScreen[Z].Height);
         }
 
 #ifdef __3DS__
