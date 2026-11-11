@@ -63,13 +63,45 @@ namespace VisualFXExperiment
                 continue;
 
             StdPicture& tx = (*chars[p.Character - 1])[p.State];
-            addSprite(sprites, tx,
-                      camX + s_round2int(p.Location.X) + pfrOffX(tx, p),
-                      camY + s_round2int(p.Location.Y) + pfrOffY(tx, p),
-                      pfrW(tx, p), pfrH(tx, p), pfrX(tx, p), pfrY(tx, p),
-                      screenWidth, screenHeight,
-                      &p.Location, Physics.PlayerGravity, p.shadowStandingBlock, true,
-                      p.GrabTime > 0);
+            const int playerX = camX + s_round2int(p.Location.X);
+            const int playerY = camY + s_round2int(p.Location.Y);
+            const int offX = pfrOffX(tx, p);
+            const int offY = pfrOffY(tx, p);
+            // Match DrawPlayer's visible upper-body crop when riding a shoe.
+            // Otherwise a full standing sprite appears in the reflection and
+            // casts a phantom shadow through the Kuribo's Shoe.
+            int playerHeight = pfrH(tx, p);
+            if(p.Mount == 1)
+            {
+                if(p.Duck)
+                    playerHeight = 0;
+                else
+                {
+                    const int peachCorrection = (p.Character == 3) ? -2 : 0;
+                    playerHeight = s_round2int(p.Location.Height) - 26 - offY + peachCorrection;
+                }
+            }
+            if(playerHeight > 0)
+                addSprite(sprites, tx,
+                          playerX + offX,
+                          playerY + offY + ((p.Mount == 1 && p.Character == 4 && p.State == 1) ? 6 : 0),
+                          pfrW(tx, p), playerHeight, pfrX(tx, p), pfrY(tx, p),
+                          screenWidth, screenHeight,
+                          &p.Location, Physics.PlayerGravity, p.shadowStandingBlock, true,
+                          p.GrabTime > 0);
+
+            if(p.Mount == 1 && p.MountType >= 1 && p.MountType <= 3)
+            {
+                // The boot is a separate 32x32 sprite, drawn at these exact
+                // coordinates and animation frame in gfx_draw_player.cpp.
+                addSprite(sprites, GFX.Boot[p.MountType],
+                          playerX + s_round2int(p.Location.Width) / 2 - 16,
+                          playerY + s_round2int(p.Location.Height) - 30,
+                          32, 32, 0, 32 * p.MountFrame,
+                          screenWidth, screenHeight,
+                          &p.Location, Physics.PlayerGravity, p.shadowStandingBlock, true,
+                          p.GrabTime > 0);
+            }
         }
 
         // NPCs include vines and enemies: use the engine's current animation frame.
@@ -437,8 +469,28 @@ namespace VisualFXExperiment
             {
                 Sprite mirrored = sprite;
                 mirrored.y = 2 * wy - (sprite.y + sprite.height);
-                drawClipped(mirrored, wx, wy, ww, wh, true,
-                            XTColor(155, 195, 220, 110));
+                const int startY = std::max(wy, mirrored.y);
+                const int endY = std::min(wy + wh, mirrored.y + mirrored.height);
+                if(startY >= endY)
+                    continue;
+
+                // Reflected water image: subtle moving horizontal distortion
+                // and depth-dependent alpha. The original caster stays intact.
+                // Four-pixel strips avoid disrupting pixel-art filtering.
+                for(int stripY = startY; stripY < endY; stripY += 4)
+                {
+                    const int stripH = std::min(4, endY - stripY);
+                    const int depth = stripY - wy;
+                    const double fade = std::max(0.0, 1.0 - depth / 112.0);
+                    if(fade <= 0.0)
+                        break;
+                    const double phase = depth * 0.19 + CommonFrame * 0.055;
+                    const int shift = s_round2int(std::sin(phase) * 2.0);
+                    Sprite rippled = mirrored;
+                    rippled.x += shift;
+                    drawClipped(rippled, wx, stripY, ww, stripH, true,
+                                XTColor(155, 195, 220, static_cast<uint8_t>(110 * fade)));
+                }
             }
         }
     }
