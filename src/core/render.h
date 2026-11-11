@@ -631,7 +631,17 @@ E_INLINE void renderCircleHole(int cx, int cy, int radius,
 #endif
 
 
-// Draw texture
+// Mask a shadow using the receiving PNG alpha or legacy GIF bitmask.
+E_INLINE void renderMaskedShadow(int x, int y, int w, int h,
+                                 StdPicture& caster, int casterSrcX, int casterSrcY,
+                                 StdPicture& receiver, int receiverSrcX, int receiverSrcY,
+                                 XTColor tint) TAIL
+#ifndef RENDER_CUSTOM
+{
+    g_render->renderMaskedShadow(x, y, w, h, caster, casterSrcX, casterSrcY,
+                                 receiver, receiverSrcX, receiverSrcY, tint);
+}
+#endif
 
 E_INLINE void renderTextureScaleEx(double xDst, double yDst, double wDst, double hDst,
                           StdPicture &tx,
