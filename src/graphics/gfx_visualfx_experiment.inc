@@ -3,6 +3,9 @@
 // It never modifies level graphics, object physics, or game data.
 namespace VisualFXExperiment
 {
+    // Shared classification for emission and shadow-casting rules.
+    static bool flameNPC(int type);
+
     struct Sprite
     {
         StdPicture* texture;
@@ -15,6 +18,7 @@ namespace VisualFXExperiment
         double resting_speed;
         int standing_block_id;
         bool grabbing_item;
+        bool casts_shadow;
     };
 
     static void addSprite(std::vector<Sprite>& out, StdPicture& texture,
@@ -24,14 +28,15 @@ namespace VisualFXExperiment
                           double restingSpeed = 0.0,
                           int standingBlockId = 0,
                           bool isPlayer = false,
-                          bool grabbingItem = false)
+                          bool grabbingItem = false,
+                          bool castsShadow = true)
     {
         if(width <= 0 || height <= 0 || x > screenWidth + 64 || y > screenHeight + 64 ||
            x + width < -64 || y + height < -64)
             return;
         Sprite sprite = {&texture, x, y, width, height, srcX, srcY,
                          actorLocation != nullptr, isPlayer, 0.0, 0.0, 0.0, 0.0, restingSpeed,
-                         standingBlockId, grabbingItem};
+                         standingBlockId, grabbingItem, castsShadow};
         if(actorLocation)
         {
             sprite.feet_x = actorLocation->X;
@@ -198,7 +203,9 @@ namespace VisualFXExperiment
                 s_round2int(npc.Location.Height) - h;
             addSprite(sprites, GFXNPC[npc.Type], x, y, w, h,
                       0, npc.Frame * h, screenWidth, screenHeight,
-                      &npc.Location, Physics.NPCGravityReal, npc.shadowStandingBlock);
+                      &npc.Location, Physics.NPCGravityReal, npc.shadowStandingBlock,
+                      false, false,
+                      !flameNPC(npc.Type) && npc.Type != NPCID_WALL_SPARK);
         }
 
         // Ordinary blocks cast shadows but do not receive them.
@@ -243,6 +250,8 @@ namespace VisualFXExperiment
                                    StdPicture& receiver, int receiverSrcX, int receiverSrcY,
                                    XTColor tint)
     {
+        if(!sprite.casts_shadow)
+            return;
         const int sx = sprite.x + 8;
         const int sy = sprite.y + 8;
         const int l = std::max(rx, sx), t = std::max(ry, sy);
@@ -310,7 +319,7 @@ namespace VisualFXExperiment
         for(size_t i = 0; i < sprites.size(); ++i)
         {
             const Sprite& sprite = sprites[i];
-            if(!sprite.is_actor || sprite.feet_width <= 0.0)
+            if(!sprite.casts_shadow || !sprite.is_actor || sprite.feet_width <= 0.0)
                 continue;
 
             if(sprite.standing_block_id > 0 && sprite.standing_block_id <= numBlock)
