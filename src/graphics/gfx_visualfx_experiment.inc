@@ -176,8 +176,9 @@ namespace VisualFXExperiment
                 const double delta = sprite.feet_y - support.Location.Y;
                 if(support.Type > 0 && !support.Hidden && !support.Invis &&
                    BlockIsSizable[support.Type] && overlap > 0.0 &&
-                   (sprite.grabbing_item ? (delta >= -4.0 && delta <= 32.0)
-                                         : std::abs(delta) <= 4.0))
+                   // Real-time collision contact is authoritative; only a
+                   // cached pickup contact needs a positional sanity check.
+                   (!sprite.grabbing_item || (delta >= -4.0 && delta <= 32.0)))
                     supportingBlock[i] = &support;
             }
 
