@@ -1032,22 +1032,28 @@ void StartStarmanMusic()
 {
     if(!g_mixerLoaded || g_starmanMusic)
         return;
-    g_starmanMusic = Mix_LoadMUS((AppPath + "sound/starman.ogg").c_str());
+
+    // Use the same primary music playback path as TheXTech's level music.
+    // A separately mixed music stream was inaudible on some installations.
+    const std::string path = SfxRoot + "starman.ogg";
+    g_starmanMusic = Mix_LoadMUS(path.c_str());
     if(!g_starmanMusic)
     {
-        pLogWarning("Starman music could not be loaded: %s", Mix_GetError());
+        pLogWarning("Starman music could not be loaded from '%s': %s", path.c_str(), Mix_GetError());
         return;
     }
-    if(g_curMusic && Mix_PlayingMusicStream(g_curMusic))
-        Mix_PauseMusicStream(g_curMusic);
+
+    if(g_curMusic)
+        Mix_HaltMusicStream(g_curMusic);
+
     Mix_VolumeMusicStream(g_starmanMusic, 64 * g_config.audio_mus_volume / 100);
-    if(Mix_PlayMusicStream(g_starmanMusic, -1) < 0)
+    if(Mix_PlayMusic(g_starmanMusic, -1) < 0)
     {
-        pLogWarning("Starman music could not play: %s", Mix_GetError());
+        pLogWarning("Starman music playback failed: %s", Mix_GetError());
         Mix_FreeMusic(g_starmanMusic);
         g_starmanMusic = nullptr;
-        if(g_curMusic && Mix_PausedMusicStream(g_curMusic))
-            Mix_ResumeMusicStream(g_curMusic);
+        if(g_curMusic)
+            Mix_PlayMusic(g_curMusic, -1);
     }
 }
 
@@ -1055,11 +1061,14 @@ void StopStarmanMusic()
 {
     if(!g_starmanMusic)
         return;
+
     Mix_HaltMusicStream(g_starmanMusic);
     Mix_FreeMusic(g_starmanMusic);
     g_starmanMusic = nullptr;
-    if(g_curMusic && Mix_PausedMusicStream(g_curMusic))
-        Mix_ResumeMusicStream(g_curMusic);
+
+    // Restore the regular level soundtrack through the engine's mixer.
+    if(g_curMusic)
+        Mix_PlayMusic(g_curMusic, -1);
 }
 
 void PauseMusic()
