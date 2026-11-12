@@ -267,7 +267,15 @@ void TouchBonus(int A, int B)
     // If NPC(B).Type = 34 Or NPC(B).Type = 169 Or NPC(B).Type = 170 Then NPC(B).Type = 9
     // End If
 
-    if(NPC[B].Type == NPCID_SWAP_POWER) // ? mushroom
+    if(NPC[B].Type == NPCID_STARMAN)
+    {
+        // A single star activates invincibility for the entire party.
+        // All players share the same timer and a second pickup refreshes it.
+        ActivateStarman();
+        PlaySoundSpatial(SFX_GotStar, NPC[B].Location);
+        RumbleForPowerup(A);
+    }
+    else if(NPC[B].Type == NPCID_SWAP_POWER) // ? mushroom
     {
         int touched_power_i = A;
         int target_i = CheckNearestLiving(A);
