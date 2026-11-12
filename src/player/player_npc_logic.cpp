@@ -64,6 +64,30 @@ void PlayerNPCLogic(int A, bool& tempSpring, bool& tempShell, int& MessageNPC, c
                 {
                     if(CheckCollision(Player[A].Location, NPC[B].Location))
                     {
+                        // Starman can be collected from the level or a block.
+                        // Collect it before running any generic NPC collision.
+                        if(NPC[B].Type == NPCID_STARMAN)
+                        {
+                            TouchBonus(A, B);
+                            continue;
+                        }
+
+                        // Contact attacks during shared star invincibility.
+                        // Never destroy coins, items, friendly NPCs, mounts,
+                        // platforms, or goal objects through this shortcut.
+                        if(g_starmanFrames > 0 && !BattleMode &&
+                           !NPC[B].Inert && !NPC[B]->IsABonus &&
+                           !NPC[B]->IsACoin && !NPC[B]->WontHurt &&
+                           !NPC[B]->CanWalkOn && !NPC[B]->IsAShell &&
+                           NPC[B].Type != NPCID_ITEM_POD &&
+                           NPC[B].Type != NPCID_VEHICLE &&
+                           NPC[B].Type != NPCID_STAR_EXIT &&
+                           NPC[B].Type != NPCID_STAR_COLLECT &&
+                           NPC[B].Type != NPCID_GOALTAPE)
+                        {
+                            NPCHit(B, 3, B);
+                            continue;
+                        }
                         if((NPC[B].Type == NPCID_METALBARREL || NPC[B].Type == NPCID_CANNONENEMY || NPC[B].Type == NPCID_HPIPE_SHORT || NPC[B].Type == NPCID_HPIPE_LONG || NPC[B].Type == NPCID_VPIPE_SHORT || NPC[B].Type == NPCID_VPIPE_LONG) && NPC[B].Projectile)
                             PlayerHurt(A);
 
