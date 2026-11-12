@@ -112,6 +112,7 @@ const AudioDefaults_t g_audioDefaults =
 #endif
 
 static Mix_Music *g_curMusic = nullptr;
+static Mix_Music *g_starmanMusic = nullptr;
 bool g_mixerLoaded = false;
 
 //! most recent argument to StartMusic. Could be a world map music ID or a section index.
@@ -1017,6 +1018,42 @@ void StartMusic(int A, int fadeInMs)
 
     s_recentMusicA = A;
     musicPlaying = true;
+}
+
+// Keep the level track paused in the background and play one shared
+// Starman stream. The file is bundled as sound/extended/starman.ogg.
+void StartStarmanMusic()
+{
+    if(!g_mixerLoaded || g_starmanMusic)
+        return;
+    g_starmanMusic = Mix_LoadMUS((AppPath + "sound/extended/starman.ogg").c_str());
+    if(!g_starmanMusic)
+    {
+        pLogWarning("Starman music could not be loaded: %s", Mix_GetError());
+        return;
+    }
+    if(g_curMusic && Mix_PlayingMusicStream(g_curMusic))
+        Mix_PauseMusicStream(g_curMusic);
+    Mix_VolumeMusicStream(g_starmanMusic, 64 * g_config.audio_mus_volume / 100);
+    if(Mix_PlayMusicStream(g_starmanMusic, -1) < 0)
+    {
+        pLogWarning("Starman music could not play: %s", Mix_GetError());
+        Mix_FreeMusic(g_starmanMusic);
+        g_starmanMusic = nullptr;
+        if(g_curMusic && Mix_PausedMusicStream(g_curMusic))
+            Mix_ResumeMusicStream(g_curMusic);
+    }
+}
+
+void StopStarmanMusic()
+{
+    if(!g_starmanMusic)
+        return;
+    Mix_HaltMusicStream(g_starmanMusic);
+    Mix_FreeMusic(g_starmanMusic);
+    g_starmanMusic = nullptr;
+    if(g_curMusic && Mix_PausedMusicStream(g_curMusic))
+        Mix_ResumeMusicStream(g_curMusic);
 }
 
 void PauseMusic()
