@@ -39,12 +39,26 @@ static inline void s_updateMultiplayerEmergence(NPC_t& n)
     if(!n.multiplayerPowerupEmerging)
         return;
 
-    // First rise visibly out of the SAME block. Only begin fanning out
-    // once most of the sprite has emerged, like a small fountain.
-    if(n.Effect2 < 22)
-        return;
-    const double delta = n.multiplayerPowerupTargetX - n.Location.X;
-    n.Location.X += std::max(-4.0, std::min(4.0, delta));
+    // All items originate at the same block opening. As they rise, guide
+    // them along separate curved paths rather than moving vertically first
+    // and abruptly sliding sideways at the top.
+    //
+    // Use the original X every frame: the animation is deterministic even
+    // when items have staggered start times or the frame rate fluctuates.
+    const double emergeHeight = (n.Effect == NPCEFF_EMERGE_DOWN)
+        ? 32.0
+        : double((n->HeightGFX > 0) ? n->HeightGFX : n->THeight);
+    const double progress = std::max(0.0, std::min(1.0,
+        double(n.Effect2) / std::max(1.0, emergeHeight)));
+
+    // Hold the common opening for the initial few pixels, then fan out
+    // gradually; smoothstep keeps both ends of the horizontal arc soft.
+    const double fanStart = 0.12;
+    const double t = std::max(0.0, std::min(1.0,
+        (progress - fanStart) / (1.0 - fanStart)));
+    const double eased = t * t * (3.0 - 2.0 * t);
+    n.Location.X = n.multiplayerPowerupOriginX +
+        (n.multiplayerPowerupTargetX - n.multiplayerPowerupOriginX) * eased;
 }
 
 static inline void s_finishMultiplayerEmergence(NPC_t& n)
