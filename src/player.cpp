@@ -508,10 +508,12 @@ void ActivateStarman()
 {
     // TheXTech updates its physics at 65 ticks/second.
     g_starmanFrames = 13 * 65;
+    StartStarmanMusic();
 }
 
 void SetupPlayers()
 {
+    StopStarmanMusic();
     g_starmanFrames = 0;
 
     // Reserve existing dummy slot 293 for the Starman collectible.
