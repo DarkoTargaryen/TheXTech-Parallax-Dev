@@ -42,6 +42,7 @@ struct ParallaxLayer
     double speedX = 0.5, speedY = 0.5;
     double offsetX = 0.0, offsetY = 0.0;
     bool repeatX = true, repeatY = false, foreground = false;
+    int frames = 1, frameSpeed = 8;
 };
 
 std::vector<ParallaxLayer> s_parallaxLayers;
@@ -87,6 +88,11 @@ void s_loadParallax(int section)
         ini.read("repeat-x", l.repeatX, true);
         ini.read("repeat-y", l.repeatY, false);
         ini.read("foreground", l.foreground, false);
+        // SMBX2-style vertical sprite strips: frames stacked top to bottom.
+        ini.read("frames", l.frames, 1);
+        ini.read("framespeed", l.frameSpeed, 8);
+        l.frames = std::max(1, std::min(l.frames, 256));
+        l.frameSpeed = std::max(1, std::min(l.frameSpeed, 10000));
         ini.endGroup();
 
         // Reject absolute paths and parent traversal in episode-supplied configs.
@@ -124,8 +130,13 @@ void s_renderParallax(int section, int view, bool foreground)
         if(picture.w <= 0 || picture.h <= 0)
             continue;
 
+        // A frame occupies 1/frames of the texture height. Repeat and
+        // clipping use the frame dimensions, not the whole sprite sheet.
+        const int frames = (picture.h % layer.frames == 0) ? layer.frames : 1;
+        const int frameH = picture.h / frames;
+        const int frame = (frames > 1) ? (CommonFrame / (uint32_t)layer.frameSpeed) % (uint32_t)frames : 0;
         const double tileW = picture.w;
-        const double tileH = picture.h;
+        const double tileH = frameH;
         // Camera-relative position: a factor of 0 stays fixed to screen,
         // a factor of 1 scrolls at normal world-space speed.
         double x = layer.offsetX - cameraX * layer.speedX;
@@ -145,7 +156,7 @@ void s_renderParallax(int section, int view, bool foreground)
                 double px = x + rx * tileW;
                 double py = y + ry * tileH;
                 if(px < width && py < height && px + tileW > 0 && py + tileH > 0)
-                    XRender::renderTexture(px, py, picture.w, picture.h, picture, 0, 0);
+                    XRender::renderTexture(px, py, picture.w, frameH, picture, 0, frame * frameH);
             }
     }
 }
