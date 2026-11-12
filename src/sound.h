@@ -199,6 +199,9 @@ void PauseMusic();
 void ResumeMusic();
 // stop playing music
 void StopMusic();
+// Temporary team-wide Starman music layered over the paused level track.
+void StartStarmanMusic();
+void StopStarmanMusic();
 // Public Sub PlayInitSound()
 void PlayInitSound();
 // Public Sub InitSound() 'readys sound and music to be played
