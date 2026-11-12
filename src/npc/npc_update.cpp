@@ -1594,20 +1594,6 @@ void UpdateNPCs()
 
                         NPCBlockLogic(A, tempHit, tempHitBlock, tempSpeedA, numTempBlock, speedVar);
 
-                        // SMBX2-style bouncing Starman: keep moving across the
-                        // floor and spring upward whenever it lands. The normal
-                        // block collision code still resolves walls and slopes.
-                        if(NPC[A].Type == NPCID_STARMAN &&
-                           NPC[A].Effect == NPCEFF_NORMAL)
-                        {
-                            if(NPC[A].Direction == 0)
-                                NPC[A].Direction = 1;
-                            if(NPC[A].Location.SpeedX == 0)
-                                NPC[A].Location.SpeedX = 1.5 * NPC[A].Direction;
-                            if(tempHit != 0 && NPC[A].Location.SpeedY >= 0)
-                                NPC[A].Location.SpeedY = -8;
-                        }
-
                         // The real NPC floor contact is more reliable than visual
                         // foot-distance checks, especially on moving/stacked blocks.
                         if(tempHit != 0 && tempHitBlock > 0 && tempHitBlock <= numBlock &&
@@ -1662,7 +1648,14 @@ void UpdateNPCs()
                         }
 
                         if(tempHit != 0) // Walking   // VERIFY ME
+                        {
                             NPCWalkingLogic(A, tempHit, tempHitBlock, tempSpeedA);
+                            // NPCWalkingLogic normally zeros vertical velocity.
+                            // Apply the Starman leap AFTER that generic grounding code.
+                            if(NPC[A].Type == NPCID_STARMAN &&
+                               NPC[A].Effect == NPCEFF_NORMAL)
+                                NPC[A].Location.SpeedY = -8.0;
+                        }
                     }
                     else
                     {
