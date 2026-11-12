@@ -31,6 +31,10 @@ void DodgePlayers(int plr_A);
 // Public Sub SetupPlayers() 'this set's the players values to their defaults and prepares them for playing a level
 // this set's the players values to their defaults and prepares them for playing a level
 void SetupPlayers();
+
+// Shared Starman invincibility timer (game frames, independent of hit immunity).
+extern int g_starmanFrames;
+void ActivateStarman();
 // Public Sub UpdatePlayer() 'This is the main sub for the players
 // This is the main sub for the players
 void UpdatePlayer();
