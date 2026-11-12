@@ -112,10 +112,21 @@ static inline void NPCEffectLogic_EmergeUp(int A)
     {
         const int emergeHeight = s_multiplayerEmergenceHeight(NPC[A]);
         s_updateMultiplayerEmergence(NPC[A]);
-        if(NPC[A].Effect2 >= emergeHeight &&
-           NPC[A].Effect2 < emergeHeight + 12)
+        if(NPC[A].Effect2 >= emergeHeight)
         {
-            ++NPC[A].Effect2;
+            if(NPC[A].Effect2 < emergeHeight + 12)
+            {
+                ++NPC[A].Effect2;
+                return;
+            }
+            // The full-size sprite has finished its arc. Transition to
+            // normal gameplay without adding an extra reveal step.
+            NPC[A].Effect = NPCEFF_NORMAL;
+            NPC[A].Effect2 = 0;
+            s_finishMultiplayerEmergence(NPC[A]);
+            NPC[A].Location.Y += NPC[A].Location.Height;
+            NPC[A].Location.Height = NPC[A]->THeight;
+            NPC[A].Location.Y -= NPC[A].Location.Height;
             return;
         }
     }
