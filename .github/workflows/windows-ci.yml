@@ -9,6 +9,7 @@ on:
       - versus-ci
       - parallax-dev
       - shadow-experiment
+      - starman
   pull_request:
     branches:
       - main
