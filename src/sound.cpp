@@ -1027,12 +1027,12 @@ void StartMusic(int A, int fadeInMs)
 }
 
 // Keep the level track paused in the background and play one shared
-// Starman stream. The file is bundled as sound/extended/starman.ogg.
+// Starman stream. The file is bundled as sound/starman.ogg.
 void StartStarmanMusic()
 {
     if(!g_mixerLoaded || g_starmanMusic)
         return;
-    g_starmanMusic = Mix_LoadMUS((AppPath + "sound/extended/starman.ogg").c_str());
+    g_starmanMusic = Mix_LoadMUS((AppPath + "sound/starman.ogg").c_str());
     if(!g_starmanMusic)
     {
         pLogWarning("Starman music could not be loaded: %s", Mix_GetError());
