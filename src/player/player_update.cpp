@@ -59,6 +59,9 @@ void UpdatePlayer()
             g_starmanFrames = 0;
         else
             --g_starmanFrames;
+
+        if(g_starmanFrames == 0)
+            StopStarmanMusic();
     }
     bool tempSpring = false;
     bool tempShell = false;
