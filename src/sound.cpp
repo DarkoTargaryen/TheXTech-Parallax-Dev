@@ -450,6 +450,12 @@ void QuitMixerX()
 {
     if(!g_mixerLoaded)
         return;
+    if(g_starmanMusic)
+    {
+        Mix_HaltMusicStream(g_starmanMusic);
+        Mix_FreeMusic(g_starmanMusic);
+        g_starmanMusic = nullptr;
+    }
 
     EndSfxThread();
 
@@ -1058,6 +1064,8 @@ void StopStarmanMusic()
 
 void PauseMusic()
 {
+    if(g_starmanMusic && Mix_PlayingMusicStream(g_starmanMusic))
+        Mix_PauseMusicStream(g_starmanMusic);
     if(!musicPlaying || !g_mixerLoaded)
         return;
 
@@ -1067,6 +1075,8 @@ void PauseMusic()
 
 void ResumeMusic()
 {
+    if(g_starmanMusic && Mix_PausedMusicStream(g_starmanMusic))
+        Mix_ResumeMusicStream(g_starmanMusic);
     if(!musicPlaying || !g_mixerLoaded)
         return;
 
@@ -1076,6 +1086,8 @@ void ResumeMusic()
 
 void StopMusic()
 {
+    // No Starman stream must survive a level exit or a music reset.
+    StopStarmanMusic();
     if(!musicPlaying || !g_mixerLoaded)
         return;
 
@@ -1450,6 +1462,12 @@ void InitSound()
 
 void UnloadSound()
 {
+    if(g_starmanMusic)
+    {
+        Mix_HaltMusicStream(g_starmanMusic);
+        Mix_FreeMusic(g_starmanMusic);
+        g_starmanMusic = nullptr;
+    }
     restoreDefaultSfx();
 
     UnloadExtSounds();
