@@ -523,11 +523,12 @@ void RegisterStarmanKill(const Location_t& loc)
         return;
 
     ++s_starmanKillCount;
-    // First seven kills: 100, 200, 400, 800, 1000, 2000, 4000.
-    // TheXTech's score frames 7..13 carry those rewards.
-    // From kill eight onward, frame 5 awards a 1-UP each time.
-    const int scoreFrame = (s_starmanKillCount >= 8) ? 5 : (6 + s_starmanKillCount);
-    MoreScore(scoreFrame, loc);
+    // Native TheXTech Points[] indices (see main/setup_vars.cpp):
+    // 2=100, 3=200, 4=400, 5=800, 6=1000, 7=2000, 8=4000,
+    // 10=1-UP. Do not apply a score multiplier here: the shared
+    // Starman kill counter alone decides the reward for each kill.
+    const int scoreIndex = (s_starmanKillCount >= 8) ? 10 : (s_starmanKillCount + 1);
+    MoreScore(scoreIndex, loc);
 }
 
 void SetupPlayers()
