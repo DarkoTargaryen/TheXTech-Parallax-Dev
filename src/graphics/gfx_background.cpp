@@ -40,6 +40,7 @@ struct ParallaxLayer
 {
     std::unique_ptr<StdPicture> texture;
     double speedX = 0.5, speedY = 0.5;
+    double autoSpeedX = 0.0; // Pixels per game frame, independent of camera.
     double offsetX = 0.0, offsetY = 0.0;
     bool repeatX = true, repeatY = false, foreground = false;
     bool anchorTop = false; // Bottom anchored by default; top for skies.
@@ -84,6 +85,7 @@ void s_loadParallax(int section)
         ini.read("image", image, std::string());
         ini.read("scroll-x", l.speedX, 0.5);
         ini.read("scroll-y", l.speedY, 0.5);
+        ini.read("auto-speed-x", l.autoSpeedX, 0.0);
         ini.read("offset-x", l.offsetX, 0.0);
         ini.read("offset-y", l.offsetY, 0.0);
         std::string anchorY = "bottom";
@@ -143,7 +145,8 @@ void s_renderParallax(int section, int view, bool foreground)
         const double tileH = frameH;
         // Camera-relative position: a factor of 0 stays fixed to screen,
         // a factor of 1 scrolls at normal world-space speed.
-        double x = layer.offsetX - cameraX * layer.speedX;
+        double x = layer.offsetX - cameraX * layer.speedX
+                   + static_cast<double>(CommonFrame) * layer.autoSpeedX;
         // offset-y=0 aligns the bottom edge of the current frame with the
         // viewport bottom. Skies may opt into top alignment with anchor-y=top.
         double y = (layer.anchorTop ? 0.0 : height - tileH)
