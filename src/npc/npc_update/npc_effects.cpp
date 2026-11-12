@@ -175,7 +175,10 @@ static inline void NPCEffectLogic_EmergeUp(int A)
     }
 
     NPC[A].Frame = EditorNPCFrame(NPC[A].Type, NPC[A].Direction, A);
-    const int emergeStep = NPC[A].multiplayerPowerupEmerging ? 2 : 1;
+    // Starman springs quickly from the SAME block rather than crawling
+    // upward like a mushroom. It launches only once fully visible.
+    const int emergeStep = (NPC[A].Type == NPCID_STARMAN)
+        ? 4 : (NPC[A].multiplayerPowerupEmerging ? 2 : 1);
     NPC[A].Effect2 += emergeStep;
     NPC[A].Location.Y -= emergeStep;
     NPC[A].Location.Height += emergeStep;
@@ -192,6 +195,11 @@ static inline void NPCEffectLogic_EmergeUp(int A)
             NPC[A].Location.Y += NPC[A].Location.Height;
             NPC[A].Location.Height = NPC[A]->THeight;
             NPC[A].Location.Y += -NPC[A].Location.Height;
+            if(NPC[A].Type == NPCID_STARMAN)
+            {
+                NPC[A].Location.SpeedY = -9.0;
+                NPC[A].Location.SpeedX = 1.5 * NPC[A].Direction;
+            }
         }
     }
     else
@@ -204,6 +212,11 @@ static inline void NPCEffectLogic_EmergeUp(int A)
             NPC[A].Effect2 = 0;
             s_finishMultiplayerEmergence(NPC[A]);
             NPC[A].Location.Height = NPC[A]->THeight;
+            if(NPC[A].Type == NPCID_STARMAN)
+            {
+                NPC[A].Location.SpeedY = -9.0;
+                NPC[A].Location.SpeedX = 1.5 * NPC[A].Direction;
+            }
         }
     }
 }
