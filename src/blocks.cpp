@@ -786,7 +786,7 @@ void BlockHit(int A, bool HitDown, int whatPlayer)
                         powerup.multiplayerLeafPop = leafPop;
                         powerup.multiplayerPowerupTargetX = centreX +
                             (item - (count - 1) * 0.5) * spacing;
-                        powerup.Effect2 = -item * 8; // each comes out of ONE block
+                        powerup.Effect2 = -item * 10; // quick successive pops through ONE opening
                         powerup.Location.SpeedX = 0;
                         powerup.Location.SpeedY = 0;
 
