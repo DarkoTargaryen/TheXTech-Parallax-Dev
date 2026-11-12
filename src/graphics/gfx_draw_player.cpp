@@ -25,6 +25,7 @@
 #include "collision.h"
 #include "core/render.h"
 #include "gfx.h"
+#include "player.h"
 
 #include "npc_id.h"
 #include "npc_traits.h"
@@ -210,6 +211,25 @@ void DrawPlayer(Player_t &p, const int Z, XTColor color)
     int B = 0;
     // double C = 0;
     XTColor s = (ShadowMode ? XTColor(64, 64, 64, color.a) : color);
+    if(g_starmanFrames > 0 && !ShadowMode)
+    {
+        // Shared rainbow cycle, applied to player AND mounted components
+        // since the same tint is passed to every player rendering call.
+        // Blink the colour only during the final second as a warning.
+        const int phase = (g_starmanFrames / 5) % 6;
+        if(g_starmanFrames > 65 || ((g_starmanFrames / 4) % 2) == 0)
+        {
+            switch(phase)
+            {
+            case 0: s = XTColor(255, 145, 145, color.a); break;
+            case 1: s = XTColor(255, 215, 120, color.a); break;
+            case 2: s = XTColor(255, 255, 140, color.a); break;
+            case 3: s = XTColor(145, 255, 170, color.a); break;
+            case 4: s = XTColor(145, 195, 255, color.a); break;
+            default: s = XTColor(225, 165, 255, color.a); break;
+            }
+        }
+    }
     //auto &p = Player[A];
 
     int sX = camX + s_round2int_plr(p.Location.X);
