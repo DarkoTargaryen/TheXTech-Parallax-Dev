@@ -73,6 +73,12 @@ void UpdatePlayer()
     // A is the current player, numPlayers is the last player. this loop updates all the players
     for(int tmpNumPlayers = numPlayers, A = 1; A <= tmpNumPlayers; A++)
     {
+        // Lightweight, native engine sparkles for each invincible player.
+        // No separate per-player timers or music streams.
+        if(g_starmanFrames > 0 && !Player[A].Dead &&
+           Player[A].TimeToLive == 0 && ((g_starmanFrames + A * 3) % 12 == 0))
+            NewEffect(EFFID_SPARKLE, Player[A].Location);
+
         // reset variables
         Player[A].ShowWarp = 0;
         // During buried-item pickup, the character's feet can temporarily move
