@@ -361,6 +361,7 @@ enum NPCID : vbint_t
 
     NPCID_CHAR3_HEAVY = 291,
     NPCID_CHAR4_HEAVY = 292,
+    NPCID_STARMAN = 293,
 };
 
 
