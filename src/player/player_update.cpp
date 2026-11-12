@@ -51,6 +51,15 @@
 
 void UpdatePlayer()
 {
+    // One update per gameplay frame, independent of active player count.
+    // The same remaining duration applies to players revived mid-effect.
+    if(g_starmanFrames > 0)
+    {
+        if(LevelMacro != LEVELMACRO_OFF || GameOutro)
+            g_starmanFrames = 0;
+        else
+            --g_starmanFrames;
+    }
     bool tempSpring = false;
     bool tempShell = false;
 
