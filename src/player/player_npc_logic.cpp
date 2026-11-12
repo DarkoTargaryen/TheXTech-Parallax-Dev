@@ -85,7 +85,12 @@ void PlayerNPCLogic(int A, bool& tempSpring, bool& tempShell, int& MessageNPC, c
                            NPC[B].Type != NPCID_STAR_COLLECT &&
                            NPC[B].Type != NPCID_GOALTAPE)
                         {
+                            // NPCHit can merely damage or transform an NPC; only
+                            // a newly killed enemy advances the shared combo.
+                            const int oldKilled = NPC[B].Killed;
                             NPCHit(B, 3, B);
+                            if(oldKilled == 0 && NPC[B].Killed != 0 && NPC[B].Killed != 9)
+                                RegisterStarmanKill(NPC[B].Location);
                             continue;
                         }
                         if((NPC[B].Type == NPCID_METALBARREL || NPC[B].Type == NPCID_CANNONENEMY || NPC[B].Type == NPCID_HPIPE_SHORT || NPC[B].Type == NPCID_HPIPE_LONG || NPC[B].Type == NPCID_VPIPE_SHORT || NPC[B].Type == NPCID_VPIPE_LONG) && NPC[B].Projectile)
