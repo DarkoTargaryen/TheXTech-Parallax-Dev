@@ -744,10 +744,13 @@ void BlockHit(int A, bool HitDown, int whatPlayer)
                 if(count > 1)
                 {
                     const NPC_t templateNpc = NPC[firstNpc];
-                    const double centreX = templateNpc.Location.X;
+                    // Spread wider as the group grows, while keeping the
+                    // pattern symmetrical about the block's actual centre.
+                    // 2 players: sprite width + 8 px; 3: +18; 4: +28.
+                    const double centreX = b.Location.X + b.Location.Width * 0.5;
                     const int itemWidth = std::max(24,
                         static_cast<int>(templateNpc.Location.Width + 0.5));
-                    const int spacing = itemWidth + 6;
+                    const int spacing = itemWidth + 8 + 10 * (count - 2);
                     const bool leafPop = (!HitDown && templateNpc.Type == NPCID_LEAF_POWER);
 
                     const bool yoshiBlock = NPCIsYoshi(C);
@@ -784,7 +787,8 @@ void BlockHit(int A, bool HitDown, int whatPlayer)
                         powerup.multiplayerPowerupOriginX = powerup.Location.X;
                         powerup.multiplayerPowerupEmerging = true;
                         powerup.multiplayerLeafPop = leafPop;
-                        powerup.multiplayerPowerupTargetX = centreX +
+                        powerup.multiplayerPowerupTargetX = centreX -
+                            powerup.Location.Width * 0.5 +
                             (item - (count - 1) * 0.5) * spacing;
                         powerup.Effect2 = -item * 10; // quick successive pops through ONE opening
                         powerup.Location.SpeedX = 0;
