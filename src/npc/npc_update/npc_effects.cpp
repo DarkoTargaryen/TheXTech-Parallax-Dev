@@ -19,6 +19,7 @@
  */
 
 #include <algorithm>
+#include <cmath>
 
 #include "sdl_proxy/sdl_stdinc.h"
 
@@ -43,18 +44,44 @@ static inline int s_multiplayerEmergenceHeight(const NPC_t& n)
         ? 32 : ((n->HeightGFX > 0) ? n->HeightGFX : n->THeight);
 }
 
-static inline double s_multiplayerArcHeight(const NPC_t& n)
+static inline int s_multiplayerPopFrames()
 {
+    return 20;
+}
+
+static inline double s_multiplayerPopHeight(const NPC_t& n)
+{
+    // Leaves should feel light, mounts have weight, flowers settle quietly.
     if(n.Type == NPCID_LEAF_POWER)
-        return 14.0;
+        return 26.0;
     if(n.Type == NPCID_ITEM_POD || n.Type == NPCID_GRN_BOOT ||
        n.Type == NPCID_RED_BOOT || n.Type == NPCID_BLU_BOOT)
-        return 9.0;
+        return 18.0;
     if(n.Type == NPCID_FIRE_POWER_S1 || n.Type == NPCID_FIRE_POWER_S3 ||
        n.Type == NPCID_FIRE_POWER_S4 || n.Type == NPCID_ICE_POWER_S3 ||
        n.Type == NPCID_ICE_POWER_S4)
-        return 6.0;
-    return 8.0;
+        return 15.0;
+    return 22.0; // mushrooms and other supported power-ups
+}
+
+static inline double s_multiplayerPopOffset(const NPC_t& n, double progress)
+{
+    const double t = std::max(0.0, std::min(1.0, progress));
+    const double pi = 3.14159265358979323846;
+    // Main leap occupies 72% of the animation. A much smaller second
+    // hop makes the landing feel springy, with no final position jump.
+    if(t < 0.72)
+        return s_multiplayerPopHeight(n) * std::sin(pi * t / 0.72);
+
+    double bounce = 4.5;
+    if(n.Type == NPCID_LEAF_POWER)
+        bounce = 6.0;
+    else if(n.Type == NPCID_FIRE_POWER_S1 || n.Type == NPCID_FIRE_POWER_S3 ||
+            n.Type == NPCID_FIRE_POWER_S4 || n.Type == NPCID_ICE_POWER_S3 ||
+            n.Type == NPCID_ICE_POWER_S4)
+        bounce = 2.0;
+
+    return bounce * std::sin(pi * (t - 0.72) / 0.28);
 }
 
 static inline void s_updateMultiplayerEmergence(NPC_t& n)
@@ -63,23 +90,23 @@ static inline void s_updateMultiplayerEmergence(NPC_t& n)
         return;
 
     const int emergeHeight = s_multiplayerEmergenceHeight(n);
-    // 12 fully revealed frames, including a slight vertical pop/settle.
-    const double t = std::max(0.0, std::min(1.0,
-        double(n.Effect2 - emergeHeight) / 12.0));
+    const double progress = double(n.Effect2 - emergeHeight) /
+        s_multiplayerPopFrames();
+    const double t = std::max(0.0, std::min(1.0, progress));
+
+    // Every sprite fully clears the real block before travelling sideways.
+    // Ease the horizontal movement so the item moves naturally along its hop.
     const double eased = t * t * (3.0 - 2.0 * t);
     n.Location.X = n.multiplayerPowerupOriginX +
         (n.multiplayerPowerupTargetX - n.multiplayerPowerupOriginX) * eased;
 
-    // Use the difference between consecutive arc offsets, so the sprite
-    // returns to its original reveal height without accumulating drift.
-    // The arc is zero at both ends and peaks halfway through the fan.
-    const double previous = std::max(0.0, std::min(1.0,
-        double(n.Effect2 - 1 - emergeHeight) / 12.0));
-    const double arc = 4.0 * t * (1.0 - t) * s_multiplayerArcHeight(n);
-    const double previousArc = 4.0 * previous * (1.0 - previous) *
-        s_multiplayerArcHeight(n);
-    const double sign = (n.Effect == NPCEFF_EMERGE_DOWN) ? 1.0 : -1.0;
-    n.Location.Y += sign * (arc - previousArc);
+    // Add only the change in vertical offset per frame; this returns each
+    // NPC precisely to its emergence height at the end of the bounce.
+    const double previousProgress = double(n.Effect2 - 1 - emergeHeight) /
+        s_multiplayerPopFrames();
+    const double shift = s_multiplayerPopOffset(n, progress) -
+        s_multiplayerPopOffset(n, previousProgress);
+    n.Location.Y += (n.Effect == NPCEFF_EMERGE_DOWN ? 1.0 : -1.0) * shift;
 }
 
 static inline void s_finishMultiplayerEmergence(NPC_t& n)
@@ -114,7 +141,7 @@ static inline void NPCEffectLogic_EmergeUp(int A)
         s_updateMultiplayerEmergence(NPC[A]);
         if(NPC[A].Effect2 >= emergeHeight)
         {
-            if(NPC[A].Effect2 < emergeHeight + 12)
+            if(NPC[A].Effect2 < emergeHeight + s_multiplayerPopFrames())
             {
                 ++NPC[A].Effect2;
                 return;
@@ -192,10 +219,15 @@ static inline void NPCEffectLogic_EmergeDown(int A)
         NPC[A].Location.Height = NPC[A]->THeight;
     s_updateMultiplayerEmergence(NPC[A]);
     if(NPC[A].multiplayerPowerupEmerging &&
-       NPC[A].Effect2 >= 32 && NPC[A].Effect2 < 44)
+       NPC[A].Effect2 >= 32)
     {
-        ++NPC[A].Effect2;
-        return;
+        if(NPC[A].Effect2 < 32 + s_multiplayerPopFrames())
+        {
+            ++NPC[A].Effect2;
+            return;
+        }
+        // Finished the pop with the entire sprite visible.
+        // Continue through the existing downward-emergence collision fixup.
     }
     if(NPC[A].Type == NPCID_LEAF_POWER)
         NPC[A].Direction = 1;
