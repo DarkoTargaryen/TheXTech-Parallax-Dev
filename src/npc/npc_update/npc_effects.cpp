@@ -39,23 +39,15 @@ static inline void s_updateMultiplayerEmergence(NPC_t& n)
     if(!n.multiplayerPowerupEmerging)
         return;
 
-    // All items originate at the same block opening. As they rise, guide
-    // them along separate curved paths rather than moving vertically first
-    // and abruptly sliding sideways at the top.
-    //
-    // Use the original X every frame: the animation is deterministic even
-    // when items have staggered start times or the frame rate fluctuates.
-    const double emergeHeight = (n.Effect == NPCEFF_EMERGE_DOWN)
-        ? 32.0
-        : double((n->HeightGFX > 0) ? n->HeightGFX : n->THeight);
-    const double progress = std::max(0.0, std::min(1.0,
-        double(n.Effect2) / std::max(1.0, emergeHeight)));
-
-    // Hold the common opening for the initial few pixels, then fan out
-    // gradually; smoothstep keeps both ends of the horizontal arc soft.
-    const double fanStart = 0.12;
+    // During the native emerge effect only part of the NPC sprite is
+    // displayed. Moving X at that point makes it look as though the sprite
+    // is being cut off by an invisible block in midair.
+    // Keep every item centred on the real block until its entire sprite is
+    // visible, then fan out over twelve frames at full height.
+    const int emergeHeight = (n.Effect == NPCEFF_EMERGE_DOWN)
+        ? 32 : ((n->HeightGFX > 0) ? n->HeightGFX : n->THeight);
     const double t = std::max(0.0, std::min(1.0,
-        (progress - fanStart) / (1.0 - fanStart)));
+        double(n.Effect2 - emergeHeight) / 12.0));
     const double eased = t * t * (3.0 - 2.0 * t);
     n.Location.X = n.multiplayerPowerupOriginX +
         (n.multiplayerPowerupTargetX - n.multiplayerPowerupOriginX) * eased;
@@ -85,20 +77,19 @@ static inline void NPCEffectLogic_EmergeUp(int A)
         ++NPC[A].Effect2;
         return;
     }
-    // Once fully above the block, stay at that height while finishing
-    // the sideways spread. Do not keep stretching the emergence sprite.
+    // After the full sprite has cleared the block, hold its full height
+    // and animate the fan-out without stretching or clipping it.
     if(NPC[A].multiplayerPowerupEmerging)
     {
         const int emergeHeight = (NPC[A]->HeightGFX > 0)
             ? NPC[A]->HeightGFX : NPC[A]->THeight;
-        if(NPC[A].Effect2 >= emergeHeight)
+        s_updateMultiplayerEmergence(NPC[A]);
+        if(NPC[A].Effect2 >= emergeHeight &&
+           NPC[A].Effect2 < emergeHeight + 12)
         {
-            s_updateMultiplayerEmergence(NPC[A]);
-            if(std::abs(NPC[A].multiplayerPowerupTargetX - NPC[A].Location.X) > 0.5)
-                return;
+            ++NPC[A].Effect2;
+            return;
         }
-        else
-            s_updateMultiplayerEmergence(NPC[A]);
     }
     if(NPC[A].Direction == 0.0f) // Move toward the closest player
     {
@@ -126,9 +117,7 @@ static inline void NPCEffectLogic_EmergeUp(int A)
     {
         if(NPC[A].Effect2 >= NPC[A]->HeightGFX)
         {
-            if(NPC[A].multiplayerPowerupEmerging &&
-               std::abs(NPC[A].multiplayerPowerupTargetX - NPC[A].Location.X) > 0.5)
-                return;
+
             NPC[A].Effect = NPCEFF_NORMAL;
             NPC[A].Effect2 = 0;
             s_finishMultiplayerEmergence(NPC[A]);
@@ -141,9 +130,7 @@ static inline void NPCEffectLogic_EmergeUp(int A)
     {
         if(NPC[A].Effect2 >= NPC[A]->THeight)
         {
-            if(NPC[A].multiplayerPowerupEmerging &&
-               std::abs(NPC[A].multiplayerPowerupTargetX - NPC[A].Location.X) > 0.5)
-                return;
+
             NPC[A].Effect = NPCEFF_NORMAL;
             NPC[A].Effect2 = 0;
             s_finishMultiplayerEmergence(NPC[A]);
@@ -162,9 +149,12 @@ static inline void NPCEffectLogic_EmergeDown(int A)
     if(NPC[A].multiplayerPowerupEmerging && NPC[A].Location.Height == 0)
         NPC[A].Location.Height = NPC[A]->THeight;
     s_updateMultiplayerEmergence(NPC[A]);
-    if(NPC[A].multiplayerPowerupEmerging && NPC[A].Effect2 >= 32 &&
-       std::abs(NPC[A].multiplayerPowerupTargetX - NPC[A].Location.X) > 0.5)
+    if(NPC[A].multiplayerPowerupEmerging &&
+       NPC[A].Effect2 >= 32 && NPC[A].Effect2 < 44)
+    {
+        ++NPC[A].Effect2;
         return;
+    }
     if(NPC[A].Type == NPCID_LEAF_POWER)
         NPC[A].Direction = 1;
     else if(NPC[A].Direction == 0.f) // Move toward the closest player
