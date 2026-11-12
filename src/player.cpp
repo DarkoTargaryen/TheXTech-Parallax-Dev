@@ -503,18 +503,38 @@ void DodgePlayers(int plr_A)
 
 // One timer for the entire team. Ordinary post-hit immunity stays separate.
 int g_starmanFrames = 0;
+// All multiplayer players contribute to the same streak.
+static int s_starmanKillCount = 0;
 
 void ActivateStarman()
 {
+    // A new Starman begins a new streak, while another Starman collected
+    // during the same invincibility period extends the current one.
+    if(g_starmanFrames <= 0)
+        s_starmanKillCount = 0;
     // TheXTech updates its physics at 65 ticks/second.
     g_starmanFrames = 13 * 65;
     StartStarmanMusic();
+}
+
+void RegisterStarmanKill(const Location_t& loc)
+{
+    if(g_starmanFrames <= 0 || GameMenu || GameOutro || BattleMode)
+        return;
+
+    ++s_starmanKillCount;
+    // First seven kills: 100, 200, 400, 800, 1000, 2000, 4000.
+    // TheXTech's score frames 7..13 carry those rewards.
+    // From kill eight onward, frame 5 awards a 1-UP each time.
+    const int scoreFrame = (s_starmanKillCount >= 8) ? 5 : (6 + s_starmanKillCount);
+    MoreScore(scoreFrame, loc);
 }
 
 void SetupPlayers()
 {
     StopStarmanMusic();
     g_starmanFrames = 0;
+    s_starmanKillCount = 0;
 
     // Reserve existing dummy slot 293 for the Starman collectible.
     // The graphics loader can now use npc-293.png (two 32x32 frames).
