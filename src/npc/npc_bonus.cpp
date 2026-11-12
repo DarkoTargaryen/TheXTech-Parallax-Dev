@@ -272,7 +272,8 @@ void TouchBonus(int A, int B)
         // A single star activates invincibility for the entire party.
         // All players share the same timer and a second pickup refreshes it.
         ActivateStarman();
-        PlaySoundSpatial(SFX_GotStar, NPC[B].Location);
+        // Music is the pickup cue. SFX_GotStar is the level-exit
+        // jingle and sounded incorrect for an invincibility power-up.
         RumbleForPowerup(A);
     }
     else if(NPC[B].Type == NPCID_SWAP_POWER) // ? mushroom
