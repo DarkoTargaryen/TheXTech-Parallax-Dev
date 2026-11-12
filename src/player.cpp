@@ -513,6 +513,19 @@ void ActivateStarman()
 void SetupPlayers()
 {
     g_starmanFrames = 0;
+
+    // Reserve existing dummy slot 293 for the Starman collectible.
+    // The graphics loader can now use npc-293.png (two 32x32 frames).
+    NPCTraits[NPCID_STARMAN].TWidth = 32;
+    NPCTraits[NPCID_STARMAN].THeight = 32;
+    NPCTraits[NPCID_STARMAN].WidthGFX = 32;
+    NPCTraits[NPCID_STARMAN].HeightGFX = 32;
+    NPCTraits[NPCID_STARMAN].TFrames = 2;
+    NPCTraits[NPCID_STARMAN].FrameSpeed = 8;
+    NPCTraits[NPCID_STARMAN].IsABonus = true;
+    NPCTraits[NPCID_STARMAN].NoFireBall = true;
+    NPCTraits[NPCID_STARMAN].NoIceBall = true;
+    NPCTraits[NPCID_STARMAN].WontHurt = true;
 //    Location_t tempLocation;
 //    Controls_t blankControls;
     int A = 0;
