@@ -155,7 +155,8 @@ static inline void NPCEffectLogic_EmergeUp(int A)
 
     if(NPC[A]->HeightGFX > 0)
     {
-        if(NPC[A].Effect2 >= NPC[A]->HeightGFX)
+        if(NPC[A].Effect2 >= NPC[A]->HeightGFX &&
+           !NPC[A].multiplayerPowerupEmerging)
         {
 
             NPC[A].Effect = NPCEFF_NORMAL;
@@ -168,7 +169,8 @@ static inline void NPCEffectLogic_EmergeUp(int A)
     }
     else
     {
-        if(NPC[A].Effect2 >= NPC[A]->THeight)
+        if(NPC[A].Effect2 >= NPC[A]->THeight &&
+           !NPC[A].multiplayerPowerupEmerging)
         {
 
             NPC[A].Effect = NPCEFF_NORMAL;
