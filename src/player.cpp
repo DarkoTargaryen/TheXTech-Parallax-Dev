@@ -501,8 +501,18 @@ void DodgePlayers(int plr_A)
     }
 }
 
+// One timer for the entire team. Ordinary post-hit immunity stays separate.
+int g_starmanFrames = 0;
+
+void ActivateStarman()
+{
+    // TheXTech updates its physics at 65 ticks/second.
+    g_starmanFrames = 13 * 65;
+}
+
 void SetupPlayers()
 {
+    g_starmanFrames = 0;
 //    Location_t tempLocation;
 //    Controls_t blankControls;
     int A = 0;
@@ -832,7 +842,7 @@ void PlayerHurt(const int A)
     Location_t tempLocation;
     int B = 0;
 
-    if(p.Dead || p.TimeToLive > 0 || p.Stoned || p.Immune > 0 || p.Effect > 0)
+    if(p.Dead || p.TimeToLive > 0 || p.Stoned || p.Immune > 0 || g_starmanFrames > 0 || p.Effect > 0)
         return;
 
 //    if(nPlay.Online) // netplay stuffs
