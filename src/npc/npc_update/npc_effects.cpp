@@ -34,23 +34,52 @@
 
 #include "main/trees.h"
 
+// The native emergence render clips sprites while they are still inside the
+// block. Keep that phase centred on the block, then fan out as complete
+// sprites. The final motion is an eased arc rather than a horizontal slide.
+static inline int s_multiplayerEmergenceHeight(const NPC_t& n)
+{
+    return (n.Effect == NPCEFF_EMERGE_DOWN)
+        ? 32 : ((n->HeightGFX > 0) ? n->HeightGFX : n->THeight);
+}
+
+static inline double s_multiplayerArcHeight(const NPC_t& n)
+{
+    if(n.Type == NPCID_LEAF_POWER)
+        return 14.0;
+    if(n.Type == NPCID_ITEM_POD || n.Type == NPCID_GRN_BOOT ||
+       n.Type == NPCID_RED_BOOT || n.Type == NPCID_BLU_BOOT)
+        return 9.0;
+    if(n.Type == NPCID_FIRE_POWER_S1 || n.Type == NPCID_FIRE_POWER_S3 ||
+       n.Type == NPCID_FIRE_POWER_S4 || n.Type == NPCID_ICE_POWER_S3 ||
+       n.Type == NPCID_ICE_POWER_S4)
+        return 6.0;
+    return 8.0;
+}
+
 static inline void s_updateMultiplayerEmergence(NPC_t& n)
 {
     if(!n.multiplayerPowerupEmerging)
         return;
 
-    // During the native emerge effect only part of the NPC sprite is
-    // displayed. Moving X at that point makes it look as though the sprite
-    // is being cut off by an invisible block in midair.
-    // Keep every item centred on the real block until its entire sprite is
-    // visible, then fan out over twelve frames at full height.
-    const int emergeHeight = (n.Effect == NPCEFF_EMERGE_DOWN)
-        ? 32 : ((n->HeightGFX > 0) ? n->HeightGFX : n->THeight);
+    const int emergeHeight = s_multiplayerEmergenceHeight(n);
+    // 12 fully revealed frames, including a slight vertical pop/settle.
     const double t = std::max(0.0, std::min(1.0,
         double(n.Effect2 - emergeHeight) / 12.0));
     const double eased = t * t * (3.0 - 2.0 * t);
     n.Location.X = n.multiplayerPowerupOriginX +
         (n.multiplayerPowerupTargetX - n.multiplayerPowerupOriginX) * eased;
+
+    // Use the difference between consecutive arc offsets, so the sprite
+    // returns to its original reveal height without accumulating drift.
+    // The arc is zero at both ends and peaks halfway through the fan.
+    const double previous = std::max(0.0, std::min(1.0,
+        double(n.Effect2 - 1 - emergeHeight) / 12.0));
+    const double arc = 4.0 * t * (1.0 - t) * s_multiplayerArcHeight(n);
+    const double previousArc = 4.0 * previous * (1.0 - previous) *
+        s_multiplayerArcHeight(n);
+    const double sign = (n.Effect == NPCEFF_EMERGE_DOWN) ? 1.0 : -1.0;
+    n.Location.Y += sign * (arc - previousArc);
 }
 
 static inline void s_finishMultiplayerEmergence(NPC_t& n)
@@ -81,8 +110,7 @@ static inline void NPCEffectLogic_EmergeUp(int A)
     // and animate the fan-out without stretching or clipping it.
     if(NPC[A].multiplayerPowerupEmerging)
     {
-        const int emergeHeight = (NPC[A]->HeightGFX > 0)
-            ? NPC[A]->HeightGFX : NPC[A]->THeight;
+        const int emergeHeight = s_multiplayerEmergenceHeight(NPC[A]);
         s_updateMultiplayerEmergence(NPC[A]);
         if(NPC[A].Effect2 >= emergeHeight &&
            NPC[A].Effect2 < emergeHeight + 12)
@@ -109,9 +137,10 @@ static inline void NPCEffectLogic_EmergeUp(int A)
     }
 
     NPC[A].Frame = EditorNPCFrame(NPC[A].Type, NPC[A].Direction, A);
-    NPC[A].Effect2 += 1;
-    NPC[A].Location.Y -= 1; // .01
-    NPC[A].Location.Height += 1;
+    const int emergeStep = NPC[A].multiplayerPowerupEmerging ? 2 : 1;
+    NPC[A].Effect2 += emergeStep;
+    NPC[A].Location.Y -= emergeStep;
+    NPC[A].Location.Height += emergeStep;
 
     if(NPC[A]->HeightGFX > 0)
     {
@@ -174,8 +203,9 @@ static inline void NPCEffectLogic_EmergeDown(int A)
         }
     }
 
-    NPC[A].Effect2 += 1;
-    NPC[A].Location.Y += 1;
+    const int emergeStep = NPC[A].multiplayerPowerupEmerging ? 2 : 1;
+    NPC[A].Effect2 += emergeStep;
+    NPC[A].Location.Y += emergeStep;
 
     if(NPC[A].Effect2 >= 32)
     {
