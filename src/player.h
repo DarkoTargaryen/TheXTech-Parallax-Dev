@@ -35,6 +35,8 @@ void SetupPlayers();
 // Shared Starman invincibility timer (game frames, independent of hit immunity).
 extern int g_starmanFrames;
 void ActivateStarman();
+// Count enemy kills once per shared multiplayer Starman period.
+void RegisterStarmanKill(const Location_t& loc);
 // Public Sub UpdatePlayer() 'This is the main sub for the players
 // This is the main sub for the players
 void UpdatePlayer();
