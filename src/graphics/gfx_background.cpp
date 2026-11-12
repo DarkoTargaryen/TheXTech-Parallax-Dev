@@ -42,6 +42,7 @@ struct ParallaxLayer
     double speedX = 0.5, speedY = 0.5;
     double offsetX = 0.0, offsetY = 0.0;
     bool repeatX = true, repeatY = false, foreground = false;
+    bool anchorTop = false; // Bottom anchored by default; top for skies.
     int frames = 1, frameSpeed = 8;
 };
 
@@ -85,6 +86,9 @@ void s_loadParallax(int section)
         ini.read("scroll-y", l.speedY, 0.5);
         ini.read("offset-x", l.offsetX, 0.0);
         ini.read("offset-y", l.offsetY, 0.0);
+        std::string anchorY = "bottom";
+        ini.read("anchor-y", anchorY, std::string("bottom"));
+        l.anchorTop = (anchorY == "top");
         ini.read("repeat-x", l.repeatX, true);
         ini.read("repeat-y", l.repeatY, false);
         ini.read("foreground", l.foreground, false);
@@ -140,7 +144,10 @@ void s_renderParallax(int section, int view, bool foreground)
         // Camera-relative position: a factor of 0 stays fixed to screen,
         // a factor of 1 scrolls at normal world-space speed.
         double x = layer.offsetX - cameraX * layer.speedX;
-        double y = layer.offsetY - cameraY * layer.speedY;
+        // offset-y=0 aligns the bottom edge of the current frame with the
+        // viewport bottom. Skies may opt into top alignment with anchor-y=top.
+        double y = (layer.anchorTop ? 0.0 : height - tileH)
+                   + layer.offsetY - cameraY * layer.speedY;
         if(layer.repeatX)
             x -= std::floor(x / tileW) * tileW;
         if(layer.repeatY)
