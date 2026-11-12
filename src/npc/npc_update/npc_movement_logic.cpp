@@ -36,8 +36,16 @@ void NPCMovementLogic(int A, float& speedVar)
 {
     // POSSIBLE SUBROUTINE: setSpeed
 
+    // Starman uses its own hop-and-run physics rather than generic walking AI.
+    if(NPC[A].Type == NPCID_STARMAN)
+    {
+        if(NPC[A].Direction == 0)
+            NPC[A].Direction = 1;
+        const double targetSpeed = 1.5 * NPC[A].Direction;
+        NPC[A].Location.SpeedX = targetSpeed;
+    }
     // Default Movement Code
-    if(s_use_default_movement(A) && NPC[A].Type != NPCID_ITEM_BURIED)
+    else if(s_use_default_movement(A) && NPC[A].Type != NPCID_ITEM_BURIED)
     {
         if(NPC[A].Direction == 0)
         {
