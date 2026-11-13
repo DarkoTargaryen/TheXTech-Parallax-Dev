@@ -25,10 +25,6 @@
 #include "gfx.h"
 #include "graphics.h"
 
-// Borderless, full-viewport overworld presentation. The legacy world-map
-// framing assets remain available in the source for easy restoration.
-static constexpr bool s_borderlessWorldMap = true;
-
 bool worldHasFrameAssets()
 {
     return GFX.WorldMapFrame_Tile.inited && (!GFX.Interface[4].inited || !GFX.isCustom(37) || GFX.isCustom(73));
@@ -87,10 +83,7 @@ void GetvScreenWorld(vScreen_t& vscreen)
     const Location_t& wpLoc = wp.Location;
 
     double margin, marginTop, marginBottom;
-    if(s_borderlessWorldMap)
-        margin = marginTop = marginBottom = 0;
-    else
-        s_getMargins(screen, margin, marginTop, marginBottom);
+    s_getMargins(screen, margin, marginTop, marginBottom);
 
     vscreen.Top = marginTop;
     vscreen.Height = screen.H - marginBottom - marginTop;
@@ -99,7 +92,7 @@ void GetvScreenWorld(vScreen_t& vscreen)
 
     // limit the vScreen to its 800x600 size (668x404) if the new world map frame assets are missing
     const bool haveFrameAssets = worldHasFrameAssets();
-    if(!s_borderlessWorldMap && !haveFrameAssets)
+    if(!haveFrameAssets)
     {
         if(vscreen.Width > 668)
         {
@@ -132,10 +125,7 @@ void GetvScreenWorld(vScreen_t& vscreen)
     // default bounds are the canonical vScreen
     const Screen_t& c_screen = screen.canonical_screen();
     double c_margin, c_marginTop, c_marginBottom;
-    if(s_borderlessWorldMap)
-        c_margin = c_marginTop = c_marginBottom = 0;
-    else
-        s_getMargins(c_screen, c_margin, c_marginTop, c_marginBottom);
+    s_getMargins(c_screen, c_margin, c_marginTop, c_marginBottom);
 
     double c_width = c_screen.W - c_margin * 2;
     double c_height = c_screen.H - c_marginTop - c_marginBottom;
@@ -149,16 +139,9 @@ void GetvScreenWorld(vScreen_t& vscreen)
 
     if(bounds.Width < vscreen.Width)
     {
-        // Keep the screen filled even when a world area is smaller than the
-        // viewport; center that area instead of shrinking the render target.
-        if(s_borderlessWorldMap)
-            vscreen.X = -(bounds.X + bounds.Width / 2 - vscreen.Width / 2);
-        else
-        {
-            vscreen.Left += (vscreen.Width - bounds.Width) / 2;
-            vscreen.Width = bounds.Width;
-            vscreen.X = -bounds.X;
-        }
+        vscreen.Left += (vscreen.Width - bounds.Width) / 2;
+        vscreen.Width = bounds.Width;
+        vscreen.X = -bounds.X;
     }
     else if(-vscreen.X < bounds.X)
         vscreen.X = -bounds.X;
@@ -167,14 +150,9 @@ void GetvScreenWorld(vScreen_t& vscreen)
 
     if(bounds.Height < vscreen.Height)
     {
-        if(s_borderlessWorldMap)
-            vscreen.Y = -(bounds.Y + bounds.Height / 2 - vscreen.Height / 2);
-        else
-        {
-            vscreen.Top += (vscreen.Height - bounds.Height) / 2;
-            vscreen.Height = bounds.Height;
-            vscreen.Y = -bounds.Y;
-        }
+        vscreen.Top += (vscreen.Height - bounds.Height) / 2;
+        vscreen.Height = bounds.Height;
+        vscreen.Y = -bounds.Y;
     }
     else if(-vscreen.Y < bounds.Y)
         vscreen.Y = -bounds.Y;
@@ -227,9 +205,6 @@ void DrawPlayerWorld(Player_t& p, int X, int Y)
 
 void DrawWorldMapFrame(const vScreen_t& vscreen)
 {
-    if(s_borderlessWorldMap)
-        return;
-
     const Screen_t& screen = Screens[vscreen.screen_ref];
 
     if(worldHasFrameAssets())
