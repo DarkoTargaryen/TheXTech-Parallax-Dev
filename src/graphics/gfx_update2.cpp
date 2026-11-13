@@ -511,8 +511,14 @@ void UpdateGraphics2(bool skipRepaint)
         DrawWorldMapFrame(vScreen[Z]);
 
 
-        int pX = vScreen[Z].ScreenLeft + 32 - 64 + 48;
-        int pY = vScreen[Z].ScreenTop - 6;
+        // Borderless world-map HUD: position the unchanged TheXTech counters
+        // at the screen edges instead of above the old 130px frame margin.
+        // Compact spacing leaves room for the counters on narrow displays.
+        const int hudLeft = 16;
+        const int hudTop = 10;
+        const int hudPlayerSpacing = (Screens[0].W < 480) ? 32 : 48;
+        int pX = hudLeft;
+        const int pY = hudTop + 64;
 
 
         XRender::setDrawPlane(PLANE_WLD_HUD);
@@ -526,34 +532,41 @@ void UpdateGraphics2(bool skipRepaint)
         for(int A = 1; A <= numPlayers; A++)
         {
             DrawPlayerWorld(Player[A], pX, pY);
-            pX += 48;
+            pX += hudPlayerSpacing;
         }
 
         // Print lives on the screen
-        DrawLives(pX + 32, vScreen[Z].ScreenTop - 20, Lives, g_100s);
+        DrawLives(pX + 32, hudTop + 46, Lives, g_100s);
 
         // Print coins on the screen
         auto& coin_icon = (Player[1].Character == 5) ? GFX.Interface[6] : GFX.Interface[2];
 
-        XRender::renderTexture(pX + 16, vScreen[Z].ScreenTop - 42, coin_icon);
-        XRender::renderTexture(pX + 40, vScreen[Z].ScreenTop - 40, GFX.Interface[1]);
-        SuperPrint(std::to_string(Coins), 1, pX + 62, vScreen[Z].ScreenTop - 40);
+        XRender::renderTexture(pX + 16, hudTop + 23, coin_icon);
+        XRender::renderTexture(pX + 40, hudTop + 25, GFX.Interface[1]);
+        SuperPrint(std::to_string(Coins), 1, pX + 62, hudTop + 25);
 
         // Print stars on the screen
         if(numStars > 0)
         {
-            XRender::renderTexture(pX + 16, vScreen[Z].ScreenTop - 64, GFX.Interface[5]);
-            XRender::renderTexture(pX + 40, vScreen[Z].ScreenTop - 62, GFX.Interface[1]);
-            SuperPrint(std::to_string(numStars), 1, pX + 62, vScreen[Z].ScreenTop - 62);
+            XRender::renderTexture(pX + 16, hudTop + 1, GFX.Interface[5]);
+            XRender::renderTexture(pX + 40, hudTop + 3, GFX.Interface[1]);
+            SuperPrint(std::to_string(numStars), 1, pX + 62, hudTop + 3);
         }
 
         // Print the level's name
         if(WorldPlayer[1].LevelIndex)
         {
+            // Place the selected level name to the right of the HUD on wide
+            // displays, or below it on narrow displays to avoid overlaps.
             int lnlx = pX + 116;
-            int lnrx = vScreen[Z].ScreenLeft + vScreen[Z].Width;
+            int lnrx = Screens[0].W - hudLeft;
+            const bool compactLevelName = (lnrx - lnlx < 140);
+            if(compactLevelName)
+                lnlx = hudLeft;
+            const int labelY = compactLevelName ? hudTop + 85 : hudTop + 34;
+            const int nameWidth = std::max(32, lnrx - lnlx);
 
-            MarqueeSpec marquee_spec(lnrx - lnlx, 10, 64, 32, -1);
+            MarqueeSpec marquee_spec(nameWidth, 10, 64, 32, -1);
             static MarqueeState marquee_state;
 
             // could make these arrays if multiple world players ever supported
@@ -565,29 +578,29 @@ void UpdateGraphics2(bool skipRepaint)
 
             int font = FontManager::fontIdFromSmbxFont(2);
 
-            if(cache_LevelIndex != WorldPlayer[1].LevelIndex || cache_vScreen_W != vScreen[Z].Width)
+            if(cache_LevelIndex != WorldPlayer[1].LevelIndex || cache_vScreen_W != nameWidth)
             {
                 cache_LevelIndex = WorldPlayer[1].LevelIndex;
-                cache_vScreen_W = vScreen[Z].Width;
+                cache_vScreen_W = nameWidth;
 
                 marquee_state.reset_width();
 
-                int max_width = lnrx - lnlx;
+                int max_width = nameWidth;
 
                 cache_LevelName_Split = WorldLevel[WorldPlayer[1].LevelIndex].LevelName;
                 // mutates cache_LevelName_Split
                 cache_LevelName_H = FontManager::optimizeTextPx(cache_LevelName_Split, max_width, font).h();
             }
 
-            if(g_config.world_map_lvlname_marquee || cache_LevelName_H > vScreen[Z].ScreenTop - 2 - 8)
+            if(g_config.world_map_lvlname_marquee || cache_LevelName_H > 30)
             {
-                SuperPrintMarquee(WorldLevel[WorldPlayer[1].LevelIndex].LevelName, 2, lnlx, vScreen[Z].ScreenTop - 21, marquee_spec, marquee_state);
+                SuperPrintMarquee(WorldLevel[WorldPlayer[1].LevelIndex].LevelName, 2, lnlx, labelY, marquee_spec, marquee_state);
                 marquee_state.advance(marquee_spec);
             }
             else
             {
                 FontManager::printText(cache_LevelName_Split.c_str(), cache_LevelName_Split.size(),
-                                        lnlx, vScreen[Z].ScreenTop - 2 - cache_LevelName_H,
+                                        lnlx, labelY,
                                         font);
             }
         }
