@@ -51,6 +51,7 @@
 
 #include "draw_planes.h"
 
+#include <algorithm>
 #include <fmt_format_ne.h>
 
 
