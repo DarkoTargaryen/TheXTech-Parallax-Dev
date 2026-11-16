@@ -400,6 +400,11 @@ public:
     /* ---- Video - Effects ----*/
     subsection effects{this, "effects", "Screen Effects"};
 
+    opt<bool> water_reflections{this, defaults(true),
+        {CompatClass::pure_preference, true}, Scope::Config,
+        "water-reflections", "Water reflections & ripples",
+        "Reflect players, NPCs, blocks and BGOs in water; turn Off for original TheXTech water visuals"};
+
     opt<bool> show_screen_shake{this,
         defaults(true), {CompatClass::pure_preference, true}, Scope::Config,
         "show-screen-shake", "Screen shake", nullptr};
