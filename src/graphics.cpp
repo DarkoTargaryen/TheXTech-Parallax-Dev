@@ -483,6 +483,18 @@ void GetvScreenAuto(vScreen_t& vscreen)
         return;
     }
 
+    // A standard 600px SMBX section has only 60px of camera travel at
+    // 960x540. Keep the viewport fixed at the floor during ordinary play.
+    // Only the deliberate four-second Up/Down look may shift it.
+    if(sectionHeight <= 600.0)
+    {
+        double y = minY + look.look_offset_y;
+        if(y < minY) y = minY;
+        if(y > maxY) y = maxY;
+        vscreen.Y = y;
+        return;
+    }
+
     // Use the whole shared viewport rather than anchoring every camera to
     // Player 1's feet. If players are too far apart for one safe view, retain
     // TheXTech's original shared-camera calculation for that frame.
