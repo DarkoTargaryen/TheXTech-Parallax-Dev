@@ -476,8 +476,9 @@ namespace VisualFXExperiment
             }
         }
 
-        for(Block_t& block : sizable)
+        for(size_t rearIndex = 0; rearIndex < sizable.size(); ++rearIndex)
         {
+            Block_t& block = sizable[rearIndex];
             if(block.Hidden || block.Invis || block.Type <= 0)
                 continue;
             const int x = camX + s_round2int(block.Location.X);
@@ -530,6 +531,57 @@ namespace VisualFXExperiment
                         }
                         drawReceiverShadow(sprites[i], x + tileX, y + tileY, tileW, tileH,
                                            receiver, srcX, srcY, shadow);
+                    }
+
+                    // Sizable blocks are rendered in Y-sorted back-to-front
+                    // order. Later blocks can cast a shifted, alpha-masked
+                    // shadow onto earlier ones, never the reverse.
+                    for(size_t frontIndex = rearIndex + 1; frontIndex < sizable.size(); ++frontIndex)
+                    {
+                        Block_t& front = sizable[frontIndex];
+                        if(front.Hidden || front.Invis || front.Type <= 0)
+                            continue;
+                        const int frontX = camX + s_round2int(front.Location.X);
+                        const int frontY = camY + s_round2int(front.Location.Y);
+                        const int frontW = s_round2int(front.Location.Width);
+                        const int frontH = s_round2int(front.Location.Height);
+                        if(frontW <= 0 || frontH <= 0 ||
+                           frontX + frontW + 8 <= x + tileX ||
+                           frontX + 8 >= x + tileX + tileW ||
+                           frontY + frontH + 8 <= y + tileY ||
+                           frontY + 8 >= y + tileY + tileH)
+                            continue;
+
+                        StdPicture& casterTexture = GFXBlockBMP[front.Type];
+                        for(int casterY = 0; casterY < frontH; casterY += 32)
+                        {
+                            const int casterH = std::min(32, frontH - casterY);
+                            const int casterSrcY = casterY == 0 ? 0 :
+                                (casterY + 32 >= frontH ? 64 : 32);
+                            for(int casterX = 0; casterX < frontW; casterX += 32)
+                            {
+                                const int casterW = std::min(32, frontW - casterX);
+                                const int casterSrcX = casterX == 0 ? 0 :
+                                    (casterX + 32 >= frontW ? 64 : 32);
+                                Sprite caster{};
+                                caster.texture = &casterTexture;
+                                caster.x = frontX + casterX;
+                                caster.y = frontY + casterY;
+                                caster.width = casterW;
+                                caster.height = casterH;
+                                caster.src_x = casterSrcX;
+                                caster.src_y = casterSrcY;
+                                caster.casts_shadow = true;
+
+                                // Suppress shadow pixels covered by the front
+                                // block itself, while retaining their spill
+                                // onto visible, opaque rear block pixels.
+                                drawReceiverShadowOutsideRect(
+                                    caster, x + tileX, y + tileY,
+                                    tileW, tileH, receiver, srcX, srcY, shadow,
+                                    frontX, frontY, frontW, frontH);
+                            }
+                        }
                     }
                 }
             }
