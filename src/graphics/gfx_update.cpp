@@ -2169,13 +2169,20 @@ void UpdateGraphicsScreen(Screen_t& screen)
             XRender::setDrawPlane(PLANE_LVL_BGO_NORM + 2);
             VisualFXExperiment::drawShadows(visualFXSprites, camX, camY,
                                              screenBackgrounds, screenSBlocks);
-            // Add sizable blocks for reflections only (after shadow collection).
-            VisualFXExperiment::appendResizableReflectionSprites(
-                screenSBlocks, camX, camY,
-                vScreen[Z].Width, vScreen[Z].Height, visualFXSprites);
-            XRender::setDrawPlane(PLANE_LVL_BGO_NORM + 3);
-            VisualFXExperiment::drawReflections(visualFXSprites, camX, camY,
-                                                 vScreen[Z].Width, vScreen[Z].Height);
+            // Add reflection-only sprites after shadows so new receivers do
+            // not change the existing shadow system.
+            if(g_config.water_reflections)
+            {
+                VisualFXExperiment::appendResizableReflectionSprites(
+                    screenSBlocks, camX, camY,
+                    vScreen[Z].Width, vScreen[Z].Height, visualFXSprites);
+                VisualFXExperiment::appendBGOReflectionSprites(
+                    screenBackgrounds, camX, camY,
+                    vScreen[Z].Width, vScreen[Z].Height, visualFXSprites);
+                XRender::setDrawPlane(PLANE_LVL_BGO_NORM + 3);
+                VisualFXExperiment::drawReflections(visualFXSprites, camX, camY,
+                                                     vScreen[Z].Width, vScreen[Z].Height);
+            }
         }
 
 #ifdef __3DS__
