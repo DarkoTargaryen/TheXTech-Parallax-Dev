@@ -156,8 +156,6 @@ void PlayerMovementX(int A, float& cursed_value_C)
                     Player[A].Location.SpeedX += 0.1 * 0.175;
                 if(Player[A].Character == 3) // PEACH
                     Player[A].Location.SpeedX += 0.05 * 0.175;
-                if(Player[A].Character == 4) // toad
-                    Player[A].Location.SpeedX += -0.05 * 0.175;
                 Player[A].Location.SpeedX += -0.1 * speedVar;
             }
             else // Running
@@ -166,8 +164,6 @@ void PlayerMovementX(int A, float& cursed_value_C)
                     Player[A].Location.SpeedX += 0.05 * 0.175;
                 if(Player[A].Character == 3) // PEACH
                     Player[A].Location.SpeedX += 0.025 * 0.175;
-                if(Player[A].Character == 4) // toad
-                    Player[A].Location.SpeedX += -0.025 * 0.175;
                 if(Player[A].Character == 5) // Link
                     Player[A].Location.SpeedX += -0.025 * speedVar;
                 else // Mario
@@ -181,8 +177,6 @@ void PlayerMovementX(int A, float& cursed_value_C)
                     Player[A].Location.SpeedX += 0.18 * 0.29;
                 if(Player[A].Character == 3) // PEACH
                     Player[A].Location.SpeedX += 0.09 * 0.29;
-                if(Player[A].Character == 4) // toad
-                    Player[A].Location.SpeedX += -0.09 * 0.29;
                 if(SuperSpeed)
                     Player[A].Location.SpeedX = Player[A].Location.SpeedX * 0.95;
             }
@@ -202,8 +196,6 @@ void PlayerMovementX(int A, float& cursed_value_C)
                     Player[A].Location.SpeedX += -0.1 * 0.175;
                 if(Player[A].Character == 3) // PEACH
                     Player[A].Location.SpeedX += -0.05 * 0.175;
-                if(Player[A].Character == 4) // toad
-                    Player[A].Location.SpeedX += 0.05 * 0.175;
                 Player[A].Location.SpeedX += 0.1 * speedVar;
             }
             else
@@ -212,8 +204,6 @@ void PlayerMovementX(int A, float& cursed_value_C)
                     Player[A].Location.SpeedX += -0.05 * 0.175;
                 if(Player[A].Character == 3) // PEACH
                     Player[A].Location.SpeedX += -0.025 * 0.175;
-                if(Player[A].Character == 4) // toad
-                    Player[A].Location.SpeedX += 0.025 * 0.175;
                 if(Player[A].Character == 5) // Link
                     Player[A].Location.SpeedX += 0.025 * speedVar;
                 else // Mario
@@ -227,8 +217,6 @@ void PlayerMovementX(int A, float& cursed_value_C)
                     Player[A].Location.SpeedX += -0.18 * 0.29;
                 if(Player[A].Character == 3) // PEACH
                     Player[A].Location.SpeedX += -0.09 * 0.29;
-                if(Player[A].Character == 4) // toad
-                    Player[A].Location.SpeedX += 0.09 * 0.29;
                 if(SuperSpeed)
                     Player[A].Location.SpeedX = Player[A].Location.SpeedX * 0.95;
             }
@@ -249,8 +237,6 @@ void PlayerMovementX(int A, float& cursed_value_C)
                 Player[A].Location.SpeedX = Player[A].Location.SpeedX * 1.003;
             if(Player[A].Character == 3) // PEACH
                 Player[A].Location.SpeedX = Player[A].Location.SpeedX * 1.0015;
-            if(Player[A].Character == 4) // toad
-                Player[A].Location.SpeedX = Player[A].Location.SpeedX * 0.9985;
             if(SuperSpeed)
                 Player[A].Location.SpeedX = Player[A].Location.SpeedX * 0.95;
         }
