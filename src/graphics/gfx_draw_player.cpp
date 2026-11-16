@@ -230,65 +230,52 @@ void DrawPlayer(Player_t &p, const int Z, XTColor color)
             }
         }
     }
-    // Modern power-up feedback using existing character sprites only.
-    // Keep the original state/frame switching, hitboxes, and effect durations.
-    // This is shared by all playable characters, including Link.
-    // The rainbow Starman tint takes precedence over transformation colours.
+    // Asset-free transformation feedback, shared by every playable character.
+    // No palette cycling, generated sprites, smoke, afterimages, or hitbox edits.
+    // Starman's existing rainbow effect retains priority.
+    int transformationBob = 0;
     if(!ShadowMode && g_starmanFrames <= 0 && p.Character >= 1 && p.Character <= 5)
     {
-        XTColor highlight(255, 255, 255, color.a);
-        bool transforming = true;
-        bool quickTransformation = false;
+        int duration = 0;
         switch(p.Effect)
         {
         case PLREFF_TURN_BIG:
-            highlight = XTColor(255, 247, 195, color.a);
-            break;
+        case PLREFF_TURN_FIRE:
+        case PLREFF_TURN_ICE:
         case PLREFF_TURN_SMALL:
         case PLREFF_FIRE_TO_BIG:
         case PLREFF_ICE_TO_BIG:
-            highlight = XTColor(255, 185, 185, color.a);
-            break;
-        case PLREFF_TURN_FIRE:
-            highlight = XTColor(255, 180, 115, color.a);
-            break;
-        case PLREFF_TURN_ICE:
-            highlight = XTColor(140, 210, 255, color.a);
+            duration = 50;
             break;
         case PLREFF_TURN_LEAF:
-            highlight = XTColor(225, 245, 145, color.a);
-            quickTransformation = true;
-            break;
         case PLREFF_TURN_STATUE:
-            highlight = XTColor(210, 195, 165, color.a);
-            quickTransformation = true;
-            break;
         case PLREFF_TURN_HEAVY:
-            highlight = XTColor(255, 215, 130, color.a);
-            quickTransformation = true;
+            duration = 14;
             break;
         default:
-            transforming = false;
             break;
         }
 
-        if(transforming)
+        if(duration != 0 && p.Mount == 0)
         {
-            // Brief white highlight alternates with a power-up colour.
-            // Flashes are most frequent at the start, then settle near the end.
-            const int elapsed = static_cast<int>(p.Effect2);
-            const int duration = quickTransformation ? 14 : 50;
-            const int cadence = elapsed < duration / 2 ? 3 : 6;
-            if((elapsed / cadence) % 2 == 0)
-                s = XTColor(255, 255, 255, color.a);
-            else
-                s = highlight;
+            const int frame = static_cast<int>(p.Effect2);
+            // Very small pixel-aligned bounce; the player remains stationary
+            // in world space and the classic transformation still runs.
+            if(frame == 1 || frame == 4 || frame == duration - 3)
+                transformationBob = -1;
+            else if(frame == 2 || frame == 3 || frame == duration - 2)
+                transformationBob = -2;
+
+            // One brief translucency pulse at the start of the effect,
+            // followed by the original SMBX power-up / damage flashing.
+            if(frame == 1 || frame == 2)
+                s.a = SDL_min(s.a, static_cast<decltype(s.a)>(200));
         }
     }
     //auto &p = Player[A];
 
     int sX = camX + s_round2int_plr(p.Location.X);
-    int sY = camY + s_round2int_plr(p.Location.Y);
+    int sY = camY + s_round2int_plr(p.Location.Y) + transformationBob;
     int w = s_round2int(p.Location.Width);
     int h = s_round2int(p.Location.Height);
 
