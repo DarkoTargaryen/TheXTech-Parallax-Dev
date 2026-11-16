@@ -63,6 +63,10 @@ struct vScreen_t : public qScreen_t
         int8_t look_direction = 0;
         int16_t look_offset_y = 0;
         int camera_section = -1;
+        // Per-viewport smoothing state for adaptive platformer camera.
+        double follow_velocity_y = 0.0;
+        double fall_lookahead_y = 0.0;
+        bool follow_initialized = false;
     };
 
     SmallScreenFeatures_t small_screen_features;
