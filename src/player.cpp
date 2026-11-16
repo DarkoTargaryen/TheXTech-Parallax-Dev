@@ -2308,21 +2308,27 @@ void PlayerFrame(Player_t &p)
 
                                 if(p.FrameCount >= 5 && p.FrameCount < 10)
                                 {
-                                    if(p.CanFly && p.Character != 3)
+                                    if((p.CanFly && p.Character != 3) ||
+                                       (p.Character == 2 && p.State != 1 &&
+                                        std::abs(p.Location.SpeedX) >= Physics.PlayerRunSpeed - 0.25))
                                         p.Frame = 16;
                                     else
                                         p.Frame = 1;
                                 }
                                 else if(p.FrameCount >= 10 && p.FrameCount < 15)
                                 {
-                                    if(p.CanFly && p.Character != 3)
+                                    if((p.CanFly && p.Character != 3) ||
+                                       (p.Character == 2 && p.State != 1 &&
+                                        std::abs(p.Location.SpeedX) >= Physics.PlayerRunSpeed - 0.25))
                                         p.Frame = 17;
                                     else
                                         p.Frame = 2;
                                 }
                                 else if(p.FrameCount >= 15 && p.FrameCount < 20)
                                 {
-                                    if(p.CanFly && p.Character != 3)
+                                    if((p.CanFly && p.Character != 3) ||
+                                       (p.Character == 2 && p.State != 1 &&
+                                        std::abs(p.Location.SpeedX) >= Physics.PlayerRunSpeed - 0.25))
                                         p.Frame = 18;
                                     else
                                         p.Frame = 3;
@@ -2330,7 +2336,9 @@ void PlayerFrame(Player_t &p)
                                 else if(p.FrameCount >= 20)
                                 {
                                     p.FrameCount -= 20;
-                                    if(p.CanFly && p.Character != 3)
+                                    if((p.CanFly && p.Character != 3) ||
+                                       (p.Character == 2 && p.State != 1 &&
+                                        std::abs(p.Location.SpeedX) >= Physics.PlayerRunSpeed - 0.25))
                                         p.Frame = 17;
                                     else
                                         p.Frame = 2;
