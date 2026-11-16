@@ -465,69 +465,93 @@ void GetvScreenAuto(vScreen_t& vscreen)
     else if(look.look_hold_frames < 260)
         ++look.look_hold_frames;
 
-    const int maxLook = sectionHeight <= 600.0
-        ? SDL_max(0, static_cast<int>(sectionHeight - vscreen.Height))
-        : 120;
+    // Allow the deliberate four-second look to inspect the entire available
+    // travel in compact sections, while limiting it to 120px in tall sections.
+    const int maxLook = SDL_max(0, SDL_min(120,
+        static_cast<int>(sectionHeight - vscreen.Height)));
     const int wantedLook = (look.look_hold_frames >= 260) ? direction * maxLook : 0;
     if(look.look_offset_y < wantedLook)
         look.look_offset_y = SDL_min(look.look_offset_y + 2, wantedLook);
     else if(look.look_offset_y > wantedLook)
         look.look_offset_y = SDL_max(look.look_offset_y - 2, wantedLook);
 
-    if(sectionHeight <= 600.0)
+    const double minY = -(section.Height - vscreen.Height);
+    const double maxY = -section.Y;
+    if(minY >= maxY)
     {
-        // Keep the level floor visible by default. The previous midpoint
-        // offset floated the camera 30px above the bottom of 600px sections
-        // at 960x540. The deliberate Up look can still inspect higher areas.
-        const double minY = -(section.Height - vscreen.Height);
-        const double maxY = -section.Y;
-        double y = minY + look.look_offset_y;
-        if(y < minY) y = minY;
-        if(y > maxY) y = maxY;
-        vscreen.Y = y;
+        vscreen.Y = maxY;
         return;
     }
 
-    // Follow all players sharing this viewport; if their spread exceeds the
-    // dead zone, retain the engine's normal group camera calculation.
+    // Use the whole shared viewport rather than anchoring every camera to
+    // Player 1's feet. If players are too far apart for one safe view, retain
+    // TheXTech's original shared-camera calculation for that frame.
     bool foundPlayer = false;
     double topY = 0.0, bottomY = 0.0;
+    double maxFallSpeed = 0.0;
     for(int i = 0; i < screen.player_count; ++i)
     {
         const Player_t& player = Player[screen.players[i]];
         if(player.Dead || player.Section != sectionId)
             continue;
-
-        const double playerTop = (player.Effect == PLREFF_RESPAWN) ? player.Effect2 : player.Location.Y;
+        const double playerTop = (player.Effect == PLREFF_RESPAWN)
+            ? player.Effect2 : player.Location.Y;
         const double playerBottom = playerTop + player.Location.Height;
         if(!foundPlayer || playerTop < topY)
             topY = playerTop;
         if(!foundPlayer || playerBottom > bottomY)
             bottomY = playerBottom;
+        maxFallSpeed = SDL_max(maxFallSpeed, player.Location.SpeedY);
         foundPlayer = true;
     }
     if(!foundPlayer || bottomY - topY > vscreen.Height - 160.0)
         return;
 
-    // Reuse the previous camera position, clamped to the current section.
-    // The upper/lower safe bands stop ordinary jumps from moving the screen.
-    const double minY = -(section.Height - vscreen.Height);
-    const double maxY = -section.Y;
-    // Remove last frame's intentional look offset before the normal
-    // dead-zone calculation; otherwise holding Up would drift indefinitely.
+    // Short SMBX sections should remain floor-aligned. Blend into a larger
+    // vertical dead zone as the section becomes taller, instead of changing
+    // camera behavior abruptly at 600px (the Mushroom Pass regression).
+    const double extraHeight = SDL_max(0.0, sectionHeight - 600.0);
+    const double tracking = SDL_min(1.0, extraHeight / 260.0);
+    const double topMargin = 40.0 + 100.0 * tracking;
+    // The falling margin increases with velocity so platforms and hazards
+    // below the player come into view before the player reaches them.
+    const double bottomMargin = 50.0 + tracking *
+        (160.0 + SDL_min(55.0, SDL_max(0.0, maxFallSpeed) * 5.0));
+
+    // Reuse last frame's actual camera position, not the just-computed
+    // vanilla value. On compact sections, gently favor the bottom anchor.
     double y = previousY - look.look_offset_y;
     if(y < minY) y = minY;
     if(y > maxY) y = maxY;
+    if(extraHeight <= 0.0)
+        y = minY;
+    else if(extraHeight < 140.0)
+    {
+        // Limit excessive sky space in slightly-taller sections without
+        // snapping the camera back every time the player jumps.
+        const double allowableRise = extraHeight * (extraHeight / 140.0);
+        y = SDL_min(y, minY + allowableRise);
+    }
 
-    constexpr double topMargin = 140.0;
-    constexpr double bottomMargin = 140.0;
-    if(topY + y < topMargin)
-        y = topMargin - topY;
-    if(bottomY + y > vscreen.Height - bottomMargin)
-        y = vscreen.Height - bottomMargin - bottomY;
+    // Only move the camera when a player leaves the safe portion of the
+    // screen. Downward movement uses extra lookahead while falling.
+    double targetY = y;
+    if(topY + targetY < topMargin)
+        targetY = topMargin - topY;
+    if(bottomY + targetY > vscreen.Height - bottomMargin)
+        targetY = vscreen.Height - bottomMargin - bottomY;
 
-    if(y < minY) y = minY;
-    if(y > maxY) y = maxY;
+    if(targetY < minY) targetY = minY;
+    if(targetY > maxY) targetY = maxY;
+
+    // Avoid sudden camera teleports when the fall lookahead first activates.
+    // Permit faster travel for fast-falling players so tracking keeps up.
+    const double maxStep = SDL_max(7.0, SDL_max(0.0, maxFallSpeed) + 2.0);
+    if(targetY > y + maxStep) y += maxStep;
+    else if(targetY < y - maxStep) y -= maxStep;
+    else y = targetY;
+
+    // Manual Up/Down look remains additive and bounded by section edges.
     y += look.look_offset_y;
     if(y < minY) y = minY;
     if(y > maxY) y = maxY;
