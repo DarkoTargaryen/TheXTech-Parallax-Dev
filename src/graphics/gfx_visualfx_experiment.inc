@@ -841,6 +841,34 @@ namespace VisualFXExperiment
             if(!nearWater)
                 continue;
 
+            // The thin BGO row placed immediately above water areas is the
+            // water's *surface*. Reflecting it creates a second upside-down
+            // surface strip. Exclude surface strips while preserving other BGOs.
+            bool waterSurfaceStrip = false;
+            if(h <= 48)
+            {
+                for(int waterId : treeWaterQuery(-camX, -camY,
+                                                -camX + screenWidth, -camY + screenHeight,
+                                                SORTMODE_ID))
+                {
+                    const Water_t& water = Water[waterId];
+                    if(water.Hidden || water.Quicksand)
+                        continue;
+                    const int surfaceX = camX + s_round2int(water.Location.X);
+                    const int surfaceY = camY + s_round2int(water.Location.Y);
+                    const int surfaceW = s_round2int(water.Location.Width);
+                    if(x < surfaceX + surfaceW && x + w > surfaceX &&
+                       y < surfaceY && y + h >= surfaceY - 6 &&
+                       y + h <= surfaceY + 12)
+                    {
+                        waterSurfaceStrip = true;
+                        break;
+                    }
+                }
+            }
+            if(waterSurfaceStrip)
+                continue;
+
             addSprite(sprites, GFXBackgroundBMP[bgo.Type],
                       x, y, w, h, 0, h * BackgroundFrame[bgo.Type],
                       screenWidth, screenHeight,
@@ -859,10 +887,10 @@ namespace VisualFXExperiment
         std::vector<ReflectionWaterRect> rects;
     };
 
-    // Combine horizontally touching water areas when their surface heights
-    // match. Levels frequently use several adjacent Moondust water rectangles
-    // to represent one pool, so they should share one continuous reflection.
-    // Retaining the rectangles avoids filling gaps or deeper/shallow regions.
+    // Treat edge-connected water rectangles as one volume, horizontally AND
+    // vertically. Lower rectangles must not introduce artificial surfaces at
+    // internal seams. Keep the original rectangles as a union-shaped clipping
+    // mask, so different depths and intentional gaps remain respected.
     static std::vector<ReflectionWaterGroup> collectReflectionWaterGroups(
         int camX, int camY, int screenWidth, int screenHeight)
     {
@@ -901,20 +929,32 @@ namespace VisualFXExperiment
                 {
                     const ReflectionWaterRect& candidate = remaining[i];
                     bool adjacent = false;
-                    if(std::abs(candidate.top - group.surface_y) <= 1)
+                    for(const ReflectionWaterRect& current : group.rects)
                     {
-                        for(const ReflectionWaterRect& current : group.rects)
+                        const int overlapX =
+                            std::min(candidate.right, current.right) -
+                            std::max(candidate.left, current.left);
+                        const int overlapY =
+                            std::min(candidate.bottom, current.bottom) -
+                            std::max(candidate.top, current.top);
+                        const bool touchX =
+                            candidate.left <= current.right + 1 &&
+                            candidate.right + 1 >= current.left;
+                        const bool touchY =
+                            candidate.top <= current.bottom + 1 &&
+                            candidate.bottom + 1 >= current.top;
+                        // Shared edge or genuine overlap; diagonal corner
+                        // contact alone does not connect two swimming pools.
+                        if((overlapX > 0 && touchY) ||
+                           (overlapY > 0 && touchX))
                         {
-                            if(candidate.left <= current.right + 1 &&
-                               candidate.right + 1 >= current.left)
-                            {
-                                adjacent = true;
-                                break;
-                            }
+                            adjacent = true;
+                            break;
                         }
                     }
                     if(adjacent)
                     {
+                        group.surface_y = std::min(group.surface_y, candidate.top);
                         group.rects.push_back(candidate);
                         remaining.erase(remaining.begin() + i);
                         changed = true;
