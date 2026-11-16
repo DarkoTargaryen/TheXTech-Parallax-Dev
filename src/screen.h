@@ -58,6 +58,11 @@ struct vScreen_t : public qScreen_t
         int16_t offset_y = 0;
         int16_t offset_y_hold = 0;
         int8_t last_buttons_held = 0;
+        // 960x540 deliberate look: 4-second hold, Player 1 only.
+        int16_t look_hold_frames = 0;
+        int8_t look_direction = 0;
+        int16_t look_offset_y = 0;
+        int camera_section = -1;
     };
 
     SmallScreenFeatures_t small_screen_features;
