@@ -347,15 +347,12 @@ void PlayerMovementX(int A, float& cursed_value_C)
             Player[A].CanFly = true;
             Player[A].RunCount = 40;
         }
-        else if(Player[A].RunCount >= 80 && Player[A].Character == 3)
+        else if(Player[A].RunCount >= 35 &&
+                (Player[A].Character == 3 || Player[A].Character == 4))
         {
+            // Peach and Toad charge Leaf/Tanooki flight at Mario's rate.
             Player[A].CanFly = true;
-            Player[A].RunCount = 80;
-        }
-        else if(Player[A].RunCount >= 60 && Player[A].Character == 4)
-        {
-            Player[A].CanFly = true;
-            Player[A].RunCount = 60;
+            Player[A].RunCount = 35;
         }
         else if(Player[A].RunCount >= 10 && Player[A].Character == 5) // link flying
         {
@@ -609,24 +606,19 @@ void PlayerMovementY(int A)
                     Player[A].RunCount = 0;
                     Player[A].CanFly2 = true;
 
-                    if(Player[A].Character == 2) // luigi doesn't fly as long as mario
-                        Player[A].FlyCount = 300; // Length of flight time
-                    else if(Player[A].Character == 3) // special handling for peach
-                    {
-                        Player[A].FlyCount = 0;
-                        Player[A].RunCount = 80;
-                        Player[A].CanFly2 = false;
-                        Player[A].Jump = 70;
-                        Player[A].CanFloat = true;
-                        Player[A].FlySparks = true;
-                    }
-#if 0
-                    // FIXME: Duplicated "Character == 3" condition branch [PVS Studio]
-                    else if(Player[A].Character == 3) // special handling for peach
-                        Player[A].FlyCount = 280; // Length of flight time
-#endif
+                    if(Player[A].Character == 2) // retain Luigi's existing flight duration
+                        Player[A].FlyCount = 300;
                     else
-                        Player[A].FlyCount = 320; // Length of flight time
+                        Player[A].FlyCount = 320; // Mario, Peach and Toad fly identically
+
+                    if(Player[A].Character == 3)
+                    {
+                        // Peach keeps her normal float, but it cannot override
+                        // a charged Leaf/Tanooki flight in progress.
+                        Player[A].CanFloat = false;
+                        Player[A].FloatTime = 0;
+                        Player[A].FlySparks = false;
+                    }
                 }
             }
             else if(Player[A].Jump > 0) // controls the height of the jump
@@ -918,7 +910,14 @@ void PlayerMovementY(int A)
     // princess float
     if(Player[A].Character == 3 && Player[A].Wet == 0 && !Player[A].WetFrame)
     {
-        if(Player[A].Location.SpeedY == 0 || Player[A].StandingOnNPC > 0 || Player[A].Slope > 0 || Player[A].CanFly2)
+        // Do not activate Peach's float while she is using Mario-style
+        // charged flight. The regular float remains available otherwise.
+        if(Player[A].CanFly2 && (Player[A].State == 4 || Player[A].State == 5))
+        {
+            Player[A].CanFloat = false;
+            Player[A].FloatTime = 0;
+        }
+        else if(Player[A].Location.SpeedY == 0 || Player[A].StandingOnNPC > 0 || Player[A].Slope > 0)
             Player[A].CanFloat = true;
         else if(Player[A].CanFloat)
         {
