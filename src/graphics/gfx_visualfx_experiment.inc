@@ -737,111 +737,61 @@ namespace VisualFXExperiment
     }
 
 
-    // Transient water-entry waves, adapted from SMATRS's ripple envelopes.
-    struct WaterRippleFX { int id; double x; int frame; double force; };
-    static std::vector<WaterRippleFX> s_rippleFX;
-
-    static double rippleDisplacement(int id, double x, double depth)
+    // Mirror visible sizable-block tiles using the same 3x3 graphics layout as
+    // the normal renderer. Added after the shadow pass so these extra sprites
+    // cannot affect shadows, collision, or other gameplay.
+    static void appendResizableReflectionSprites(
+        const std::vector<BlockRef_t>& sizable,
+        int camX, int camY, int screenWidth, int screenHeight,
+        std::vector<Sprite>& sprites)
     {
-        double wave = 0.0;
-        for(const WaterRippleFX& r : s_rippleFX)
+        for(Block_t& block : sizable)
         {
-            if(r.id != id) continue;
-            const double age = CommonFrame - r.frame;
-            if(age < 0 || age > 52) continue;
-            const double radius = 10.0 + age * 1.8;
-            const double distance = std::abs(x - r.x);
-            if(distance >= radius) continue;
-            const double fade = (1.0 - age / 52.0) *
-                                (1.0 - distance / radius) *
-                                std::max(0.0, 1.0 - depth / 110.0);
-            wave += std::sin((distance - age * 2.2) * 0.25) * r.force * fade;
-        }
-        return wave;
-    }
+            if(block.Hidden || block.Invis || block.Type <= 0)
+                continue;
 
-    static void updateWaterRippleFX(const std::vector<Sprite>& sprites,
-                                    int camX, int camY, int w, int h)
-    {
-        s_rippleFX.erase(std::remove_if(s_rippleFX.begin(), s_rippleFX.end(),
-            [](const WaterRippleFX& r) {
-                return CommonFrame < r.frame || CommonFrame - r.frame > 52;
-            }), s_rippleFX.end());
+            const int x = camX + s_round2int(block.Location.X);
+            const int y = camY + s_round2int(block.Location.Y);
+            const int w = s_round2int(block.Location.Width);
+            const int h = s_round2int(block.Location.Height);
+            if(w <= 0 || h <= 0 || x >= screenWidth || x + w <= 0)
+                continue;
 
-        for(int id : treeWaterQuery(-camX, -camY, -camX + w, -camY + h, SORTMODE_ID))
-        {
-            const Water_t& water = Water[id];
-            if(water.Hidden || water.Quicksand) continue;
-            for(const Sprite& sprite : sprites)
+            // Reflected content originates above the surface, so skip blocks
+            // that cannot intersect the visible waterline or reflection region.
+            bool nearWater = false;
+            for(int id : treeWaterQuery(-camX, -camY,
+                                        -camX + screenWidth, -camY + screenHeight,
+                                        SORTMODE_ID))
             {
-                if(!sprite.is_actor || sprite.vertical_speed <= 0.5 ||
-                   sprite.feet_y < water.Location.Y ||
-                   sprite.feet_y - sprite.vertical_speed >= water.Location.Y ||
-                   sprite.feet_x + sprite.feet_width <= water.Location.X ||
-                   sprite.feet_x >= water.Location.X + water.Location.Width)
+                const Water_t& water = Water[id];
+                if(water.Hidden || water.Quicksand)
                     continue;
-                const double x = sprite.feet_x + sprite.feet_width / 2.0;
-                bool duplicate = false;
-                for(const WaterRippleFX& r : s_rippleFX)
-                    if(r.id == id && r.frame == CommonFrame && std::abs(r.x - x) < 8.0)
-                        duplicate = true;
-                if(duplicate) continue;
-                if(s_rippleFX.size() >= 64) s_rippleFX.erase(s_rippleFX.begin());
-                s_rippleFX.push_back({id, x, CommonFrame,
-                                      std::min(6.0, sprite.vertical_speed * 0.6)});
-            }
-        }
-    }
-
-    // Only modifies existing BGOs within the water-area rectangle.
-    // Entirely separate from the editor and the source image.
-    static void drawWaterBgoFX(const std::vector<BaseRef_t>& bgos,
-                               int camX, int camY, int width, int height)
-    {
-        if(!g_config.enhanced_water_fx || s_rippleFX.empty()) return;
-        for(int id : treeWaterQuery(-camX, -camY,
-                                     -camX + width, -camY + height, SORTMODE_ID))
-        {
-            const Water_t& water = Water[id];
-            if(water.Hidden || water.Quicksand) continue;
-            bool hasWave = false;
-            for(const WaterRippleFX& r : s_rippleFX)
-                if(r.id == id) { hasWave = true; break; }
-            if(!hasWave) continue;
-            const int wx = camX + s_round2int(water.Location.X);
-            const int wy = camY + s_round2int(water.Location.Y);
-            const int wr = wx + s_round2int(water.Location.Width);
-            const int wb = wy + s_round2int(water.Location.Height);
-            for(const BaseRef_t& ref : bgos)
-            {
-                const int index = static_cast<int>(ref);
-                if(index < 1 || index > numBackground) continue;
-                const Background_t& bgo = Background[index];
-                if(bgo.Hidden || bgo.SortPriority >= Background_t::PRI_FG_START) continue;
-                const int bx = camX + s_round2int(bgo.Location.X);
-                const int by = camY + s_round2int(bgo.Location.Y);
-                const int bw = BackgroundWidth[bgo.Type];
-                const int bh = BackgroundHeight[bgo.Type];
-                const int left = std::max(0, std::max(wx, bx));
-                const int right = std::min(width, std::min(wr, bx + bw));
-                const int top = std::max(0, std::max(wy, by));
-                const int bottom = std::min(height, std::min(wb, by + bh));
-                if(right <= left || bottom <= top) continue;
-                StdPicture& texture = GFXBackgroundBMP[bgo.Type];
-                for(int y = top; y < bottom; y += 4)
+                const int wx = camX + s_round2int(water.Location.X);
+                const int wy = camY + s_round2int(water.Location.Y);
+                const int ww = s_round2int(water.Location.Width);
+                if(x < wx + ww && x + w > wx && y < wy && y + h >= wy - 112)
                 {
-                    const int stripH = std::min(4, bottom - y);
-                    const int depth = y - wy;
-                    const int shift = s_round2int(rippleDisplacement(
-                        id, -camX + (left + right) * 0.5, depth));
-                    const int sampleL = std::max(bx, left + shift);
-                    const int sampleR = std::min(bx + bw, right + shift);
-                    if(sampleR <= sampleL) continue;
-                    XRender::renderTextureScaleEx(sampleL - shift, y,
-                        sampleR - sampleL, stripH, texture,
-                        sampleL - bx, bh * BackgroundFrame[bgo.Type] + y - by,
-                        sampleR - sampleL, stripH, 0.0, nullptr, X_FLIP_NONE,
-                        XTColor(255, 255, 255, 255));
+                    nearWater = true;
+                    break;
+                }
+            }
+            if(!nearWater)
+                continue;
+
+            StdPicture& texture = GFXBlockBMP[block.Type];
+            for(int tileY = 0; tileY < h; tileY += 32)
+            {
+                const int tileH = std::min(32, h - tileY);
+                const int srcY = tileY == 0 ? 0 : (tileY + 32 >= h ? 64 : 32);
+                for(int tileX = 0; tileX < w; tileX += 32)
+                {
+                    const int tileW = std::min(32, w - tileX);
+                    const int srcX = tileX == 0 ? 0 : (tileX + 32 >= w ? 64 : 32);
+                    addSprite(sprites, texture, x + tileX, y + tileY,
+                              tileW, tileH, srcX, srcY,
+                              screenWidth, screenHeight,
+                              nullptr, 0.0, 0, false, false, false);
                 }
             }
         }
@@ -850,8 +800,6 @@ namespace VisualFXExperiment
     static void drawReflections(const std::vector<Sprite>& sprites,
                                 int camX, int camY, int screenWidth, int screenHeight)
     {
-        if(g_config.enhanced_water_fx)
-            updateWaterRippleFX(sprites, camX, camY, screenWidth, screenHeight);
         for(int n : treeWaterQuery(-camX, -camY,
                                    -camX + screenWidth, -camY + screenHeight,
                                    SORTMODE_ID))
@@ -922,10 +870,7 @@ namespace VisualFXExperiment
                     if(opacity <= 0)
                         continue;
                     const double phase = depth * 0.19 + CommonFrame * 0.055;
-                    const int shift = s_round2int(std::sin(phase) * 2.0 +
-                        (g_config.enhanced_water_fx
-                         ? rippleDisplacement(n, -camX + sprite.x + sprite.width / 2.0, depth)
-                         : 0.0));
+                    const int shift = s_round2int(std::sin(phase) * 2.0);
                     Sprite rippled = mirrored;
                     rippled.x += shift;
                     drawClipped(rippled, wx, stripY, ww, stripH, true,
