@@ -465,8 +465,10 @@ void GetvScreenAuto(vScreen_t& vscreen)
     else if(look.look_hold_frames < 260)
         ++look.look_hold_frames;
 
-    const int maxLook = sectionHeight <= 600.0 ? 60 : 120;
-    const int wantedLook = (look.look_hold_frames >= 260) ? -direction * maxLook : 0;
+    const int maxLook = sectionHeight <= 600.0
+        ? SDL_max(0, static_cast<int>((sectionHeight - vscreen.Height) / 2))
+        : 120;
+    const int wantedLook = (look.look_hold_frames >= 260) ? direction * maxLook : 0;
     if(look.look_offset_y < wantedLook)
         look.look_offset_y = SDL_min(look.look_offset_y + 2, wantedLook);
     else if(look.look_offset_y > wantedLook)
@@ -474,12 +476,13 @@ void GetvScreenAuto(vScreen_t& vscreen)
 
     if(sectionHeight <= 600.0)
     {
-        // 600px-high SMBX sections normally stay fixed at the floor.
-        // Look Up pans to the top 60px after four seconds, and releasing
-        // returns smoothly to the default floor-aligned position.
+        // A 600px section has 60px of travel. Centre that travel (30px
+        // each way) so both Up and Down are useful, without automatic
+        // vertical movement during jumps.
         const double minY = -(section.Height - vscreen.Height);
         const double maxY = -section.Y;
-        double y = minY + look.look_offset_y;
+        const double middleY = (minY + maxY) / 2.0;
+        double y = middleY + look.look_offset_y;
         if(y < minY) y = minY;
         if(y > maxY) y = maxY;
         vscreen.Y = y;
