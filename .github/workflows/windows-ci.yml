@@ -10,6 +10,7 @@ on:
       - parallax-dev
       - shadow-experiment
       - starman
+      - powerup-animations
   pull_request:
     branches:
       - main
