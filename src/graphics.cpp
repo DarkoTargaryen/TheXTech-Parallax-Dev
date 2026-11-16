@@ -466,7 +466,7 @@ void GetvScreenAuto(vScreen_t& vscreen)
         ++look.look_hold_frames;
 
     const int maxLook = sectionHeight <= 600.0
-        ? SDL_max(0, static_cast<int>((sectionHeight - vscreen.Height) / 2))
+        ? SDL_max(0, static_cast<int>(sectionHeight - vscreen.Height))
         : 120;
     const int wantedLook = (look.look_hold_frames >= 260) ? direction * maxLook : 0;
     if(look.look_offset_y < wantedLook)
@@ -476,13 +476,12 @@ void GetvScreenAuto(vScreen_t& vscreen)
 
     if(sectionHeight <= 600.0)
     {
-        // A 600px section has 60px of travel. Centre that travel (30px
-        // each way) so both Up and Down are useful, without automatic
-        // vertical movement during jumps.
+        // Keep the level floor visible by default. The previous midpoint
+        // offset floated the camera 30px above the bottom of 600px sections
+        // at 960x540. The deliberate Up look can still inspect higher areas.
         const double minY = -(section.Height - vscreen.Height);
         const double maxY = -section.Y;
-        const double middleY = (minY + maxY) / 2.0;
-        double y = middleY + look.look_offset_y;
+        double y = minY + look.look_offset_y;
         if(y < minY) y = minY;
         if(y > maxY) y = maxY;
         vscreen.Y = y;
