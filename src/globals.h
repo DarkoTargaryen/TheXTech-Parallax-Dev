@@ -707,6 +707,10 @@ struct Player_t
     bool CanJump = false;
 //    CanAltJump As Boolean 'true if the player can alt jump
     bool CanAltJump = false;
+    // Optional per-player five-frame movement assistance; gameplay only.
+    uint8_t coyoteFrames = 0;
+    uint8_t jumpBufferFrames = 0;
+    uint8_t spinBufferFrames = 0;
 //    Effect As Integer 'for various effects like shrinking/growing/warping
     PlayerEffect Effect = PLREFF_NORMAL;
 //    Effect2 As Double 'counter for the effects
