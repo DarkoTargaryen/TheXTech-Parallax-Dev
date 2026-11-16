@@ -230,52 +230,10 @@ void DrawPlayer(Player_t &p, const int Z, XTColor color)
             }
         }
     }
-    // Asset-free transformation feedback, shared by every playable character.
-    // No palette cycling, generated sprites, smoke, afterimages, or hitbox edits.
-    // Starman's existing rainbow effect retains priority.
-    int transformationBob = 0;
-    if(!ShadowMode && g_starmanFrames <= 0 && p.Character >= 1 && p.Character <= 5)
-    {
-        int duration = 0;
-        switch(p.Effect)
-        {
-        case PLREFF_TURN_BIG:
-        case PLREFF_TURN_FIRE:
-        case PLREFF_TURN_ICE:
-        case PLREFF_TURN_SMALL:
-        case PLREFF_FIRE_TO_BIG:
-        case PLREFF_ICE_TO_BIG:
-            duration = 50;
-            break;
-        case PLREFF_TURN_LEAF:
-        case PLREFF_TURN_STATUE:
-        case PLREFF_TURN_HEAVY:
-            duration = 14;
-            break;
-        default:
-            break;
-        }
-
-        if(duration != 0 && p.Mount == 0)
-        {
-            const int frame = static_cast<int>(p.Effect2);
-            // Very small pixel-aligned bounce; the player remains stationary
-            // in world space and the classic transformation still runs.
-            if(frame == 1 || frame == 4 || frame == duration - 3)
-                transformationBob = -1;
-            else if(frame == 2 || frame == 3 || frame == duration - 2)
-                transformationBob = -2;
-
-            // One brief translucency pulse at the start of the effect,
-            // followed by the original SMBX power-up / damage flashing.
-            if(frame == 1 || frame == 2)
-                s.a = SDL_min(s.a, static_cast<decltype(s.a)>(200));
-        }
-    }
     //auto &p = Player[A];
 
     int sX = camX + s_round2int_plr(p.Location.X);
-    int sY = camY + s_round2int_plr(p.Location.Y) + transformationBob;
+    int sY = camY + s_round2int_plr(p.Location.Y);
     int w = s_round2int(p.Location.Width);
     int h = s_round2int(p.Location.Height);
 
