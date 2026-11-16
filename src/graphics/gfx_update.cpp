@@ -3161,7 +3161,9 @@ void UpdateGraphicsMeta()
     if(PrintFPS > 0 && g_config.show_fps)
         SuperPrint(std::to_string(PrintFPS), 1, XRender::TargetOverscanX + 8, 8, {0, 255, 0});
 
-    if(g_VanillaCam && (XRender::TargetW > 800 || XRender::TargetH > 600) && GFX.Camera.inited)
+    // 960x540 uses an invisible, Player-1-controlled four-second camera look.
+    if(g_VanillaCam && !(g_config.internal_res.m_value.first == 960 && g_config.internal_res.m_value.second == 540) &&
+       (XRender::TargetW > 800 || XRender::TargetH > 600) && GFX.Camera.inited)
         XRender::renderTexture(XRender::TargetW - XRender::TargetOverscanX - GFX.Camera.w - 4, XRender::TargetH - GFX.Camera.h - 4, GFX.Camera);
 
     g_stats.print();
