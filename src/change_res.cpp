@@ -109,6 +109,10 @@ void UpdateInternalRes()
     int req_w = g_config.internal_res.m_value.first;
     int req_h = g_config.internal_res.m_value.second;
 
+    // 960x540 is a deliberately smaller gameplay viewport. Do not silently
+    // promote it to the canonical 600px camera height.
+    const bool pixelPerfectCamera = (req_w == 960 && req_h == 540) && !LevelEditor;
+
 #ifndef PGE_MIN_PORT
     if(l_screen->Type == ScreenTypes::Quad && g_config.internal_res_4p.m_value.first != 0)
     {
@@ -122,7 +126,7 @@ void UpdateInternalRes()
     int canon_w = l_screen->canonical_screen().W;
     int canon_h = l_screen->canonical_screen().H;
 
-    if(!g_config.allow_multires && !ignore_compat)
+    if(!g_config.allow_multires && !ignore_compat && !pixelPerfectCamera)
     {
         if((req_w != 0 && req_w < canon_w) || (req_h != 0 && req_h < canon_h))
         {
@@ -286,7 +290,7 @@ void UpdateInternalRes()
 #endif
 
     // DONE: above should tweak render target resolution. This should tweak game's screen resolution.
-    if(ignore_compat || (g_config.allow_multires && g_config.dynamic_camera_logic))
+    if(ignore_compat || pixelPerfectCamera || (g_config.allow_multires && g_config.dynamic_camera_logic))
     {
         l_screen->W = XRender::TargetW;
         l_screen->H = XRender::TargetH;
@@ -302,7 +306,7 @@ void UpdateInternalRes()
         l_screen->H = canon_h;
     }
 
-    if(!GameMenu && !GameOutro && !LevelEditor && !BattleMode && g_VanillaCam)
+    if(!GameMenu && !GameOutro && !LevelEditor && !BattleMode && g_VanillaCam && !pixelPerfectCamera)
     {
         XRender::TargetW = SDL_max(XRender::TargetW, canon_w);
         XRender::TargetH = SDL_max(XRender::TargetH, canon_h);
