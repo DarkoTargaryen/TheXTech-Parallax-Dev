@@ -447,6 +447,9 @@ void GetvScreenAuto(vScreen_t& vscreen)
         look.look_direction = 0;
         look.look_hold_frames = 0;
         look.look_offset_y = 0;
+        look.follow_velocity_y = 0.0;
+        look.fall_lookahead_y = 0.0;
+        look.follow_initialized = false;
     }
 
     // TheXTech simulates 65 frames per second. The action starts only after
@@ -467,6 +470,7 @@ void GetvScreenAuto(vScreen_t& vscreen)
 
     // Allow the deliberate four-second look to inspect the entire available
     // travel in compact sections, while limiting it to 120px in tall sections.
+    const int previousLookOffset = look.look_offset_y;
     const int maxLook = SDL_max(0, SDL_min(120,
         static_cast<int>(sectionHeight - vscreen.Height)));
     const int wantedLook = (look.look_hold_frames >= 260) ? direction * maxLook : 0;
@@ -517,7 +521,14 @@ void GetvScreenAuto(vScreen_t& vscreen)
         foundPlayer = true;
     }
     if(!foundPlayer || bottomY - topY > vscreen.Height - 160.0)
+    {
+        // The engine may choose a different multiplayer framing mode.
+        // Restart the smooth follow from its chosen position on re-entry.
+        look.follow_velocity_y = 0.0;
+        look.fall_lookahead_y = 0.0;
+        look.follow_initialized = false;
         return;
+    }
 
     // Short SMBX sections should remain floor-aligned. Blend into a larger
     // vertical dead zone as the section becomes taller, instead of changing
@@ -527,12 +538,30 @@ void GetvScreenAuto(vScreen_t& vscreen)
     const double topMargin = 40.0 + 100.0 * tracking;
     // The falling margin increases with velocity so platforms and hazards
     // below the player come into view before the player reaches them.
-    const double bottomMargin = 50.0 + tracking *
-        (160.0 + SDL_min(55.0, SDL_max(0.0, maxFallSpeed) * 5.0));
+    // Smooth the falling lookahead independently of camera motion. Landing
+    // or briefly releasing a jump should not abruptly change composition.
+    const double wantedFallLook = tracking *
+        SDL_min(55.0, SDL_max(0.0, maxFallSpeed) * 5.0);
+    const double lookDelta = wantedFallLook - look.fall_lookahead_y;
+    const double lookStep = lookDelta > 0.0 ? 2.5 : 1.5;
+    if(lookDelta > lookStep)
+        look.fall_lookahead_y += lookStep;
+    else if(lookDelta < -lookStep)
+        look.fall_lookahead_y -= lookStep;
+    else
+        look.fall_lookahead_y = wantedFallLook;
+    const double bottomMargin = 50.0 + tracking * 160.0 +
+        look.fall_lookahead_y;
 
     // Reuse last frame's actual camera position, not the just-computed
     // vanilla value. On compact sections, gently favor the bottom anchor.
-    double y = previousY - look.look_offset_y;
+    // The vanilla camera calculated above provides a safe initial position
+    // after entering a section or returning from special shared framing.
+    // Remove the *previous* look offset, not the newly updated one.
+    double y = look.follow_initialized
+        ? previousY - previousLookOffset
+        : vscreen.Y - previousLookOffset;
+    look.follow_initialized = true;
     if(y < minY) y = minY;
     if(y > maxY) y = maxY;
     if(extraHeight <= 0.0)
@@ -556,12 +585,37 @@ void GetvScreenAuto(vScreen_t& vscreen)
     if(targetY < minY) targetY = minY;
     if(targetY > maxY) targetY = maxY;
 
-    // Avoid sudden camera teleports when the fall lookahead first activates.
-    // Permit faster travel for fast-falling players so tracking keeps up.
-    const double maxStep = SDL_max(7.0, SDL_max(0.0, maxFallSpeed) + 2.0);
-    if(targetY > y + maxStep) y += maxStep;
-    else if(targetY < y - maxStep) y -= maxStep;
-    else y = targetY;
+    // Accelerated, critically-braked follow: ease into camera travel and
+    // slow before reaching the target, avoiding instant 7px/frame starts.
+    // A high fall speed raises the cap so the player cannot outrun the view.
+    const double delta = targetY - y;
+    if(std::abs(delta) < 0.35)
+    {
+        y = targetY;
+        look.follow_velocity_y = 0.0;
+    }
+    else
+    {
+        const double acceleration = 1.25;
+        const double speedCap = SDL_max(9.0,
+            SDL_max(0.0, maxFallSpeed) + 3.0);
+        const double brakingSpeed = std::sqrt(2.0 * acceleration * std::abs(delta));
+        const double desiredVelocity = (delta > 0.0 ? 1.0 : -1.0) *
+            SDL_min(speedCap, brakingSpeed);
+        if(look.follow_velocity_y < desiredVelocity)
+            look.follow_velocity_y = SDL_min(
+                look.follow_velocity_y + acceleration, desiredVelocity);
+        else
+            look.follow_velocity_y = SDL_max(
+                look.follow_velocity_y - acceleration, desiredVelocity);
+        if(std::abs(look.follow_velocity_y) >= std::abs(delta))
+        {
+            y = targetY;
+            look.follow_velocity_y = 0.0;
+        }
+        else
+            y += look.follow_velocity_y;
+    }
 
     // Manual Up/Down look remains additive and bounded by section edges.
     y += look.look_offset_y;
