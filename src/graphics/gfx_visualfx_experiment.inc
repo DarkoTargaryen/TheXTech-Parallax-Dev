@@ -305,6 +305,46 @@ namespace VisualFXExperiment
                                receiverSrcX + (x1 - rx), receiverSrcY + (y0 - ry), tint);
     }
 
+    struct ShadowPiece
+    {
+        int x, y, w, h;
+    };
+
+    // Cut an opaque foreground rectangle from each visible shadow fragment.
+    // Keeping receiver fragments separate ensures a shadow drawn on a rear
+    // resizable cannot paint over the face of a nearer resizable.
+    static void subtractShadowCover(std::vector<ShadowPiece>& pieces,
+                                    int coverX, int coverY, int coverW, int coverH)
+    {
+        if(coverW <= 0 || coverH <= 0 || pieces.empty())
+            return;
+
+        std::vector<ShadowPiece> visible;
+        visible.reserve(pieces.size() * 2);
+        for(const ShadowPiece& p : pieces)
+        {
+            const int left = std::max(p.x, coverX);
+            const int top = std::max(p.y, coverY);
+            const int right = std::min(p.x + p.w, coverX + coverW);
+            const int bottom = std::min(p.y + p.h, coverY + coverH);
+            if(left >= right || top >= bottom)
+            {
+                visible.push_back(p);
+                continue;
+            }
+
+            if(top > p.y)
+                visible.push_back({p.x, p.y, p.w, top - p.y});
+            if(bottom < p.y + p.h)
+                visible.push_back({p.x, bottom, p.w, p.y + p.h - bottom});
+            if(left > p.x)
+                visible.push_back({p.x, top, left - p.x, bottom - top});
+            if(right < p.x + p.w)
+                visible.push_back({right, top, p.x + p.w - right, bottom - top});
+        }
+        pieces.swap(visible);
+    }
+
     static void drawShadows(const std::vector<Sprite>& sprites,
                             int camX, int camY,
                             const std::vector<BaseRef_t>& bgos,
@@ -416,10 +456,6 @@ namespace VisualFXExperiment
             // pass (drawn later) paints BGO silhouettes over foreground floors.
             // Clip only the caster/receiver overlap to avoid splitting entire
             // large BGOs for every sizable in the scene.
-            struct ShadowPiece
-            {
-                int x, y, w, h;
-            };
             for(const Sprite& sprite : sprites)
             {
                 const int left = std::max(x, sprite.x + 8);
@@ -434,39 +470,11 @@ namespace VisualFXExperiment
                 {
                     if(occluder.Hidden || occluder.Invis || occluder.Type <= 0)
                         continue;
-                    const int ox = camX + s_round2int(occluder.Location.X);
-                    const int oy = camY + s_round2int(occluder.Location.Y);
-                    const int ow = s_round2int(occluder.Location.Width);
-                    const int oh = s_round2int(occluder.Location.Height);
-                    if(ow <= 0 || oh <= 0 || ox >= right || oy >= bottom ||
-                       ox + ow <= left || oy + oh <= top)
-                        continue;
-
-                    std::vector<ShadowPiece> visible;
-                    visible.reserve(pieces.size() * 2);
-                    for(const ShadowPiece& p : pieces)
-                    {
-                        const int l = std::max(p.x, ox);
-                        const int t = std::max(p.y, oy);
-                        const int r = std::min(p.x + p.w, ox + ow);
-                        const int b = std::min(p.y + p.h, oy + oh);
-                        if(l >= r || t >= b)
-                        {
-                            visible.push_back(p);
-                            continue;
-                        }
-                        // Four non-overlapping strips around the foreground
-                        // block. Receiver texture offsets are recovered below.
-                        if(t > p.y)
-                            visible.push_back({p.x, p.y, p.w, t - p.y});
-                        if(b < p.y + p.h)
-                            visible.push_back({p.x, b, p.w, p.y + p.h - b});
-                        if(l > p.x)
-                            visible.push_back({p.x, t, l - p.x, b - t});
-                        if(r < p.x + p.w)
-                            visible.push_back({r, t, p.x + p.w - r, b - t});
-                    }
-                    pieces.swap(visible);
+                    subtractShadowCover(pieces,
+                        camX + s_round2int(occluder.Location.X),
+                        camY + s_round2int(occluder.Location.Y),
+                        s_round2int(occluder.Location.Width),
+                        s_round2int(occluder.Location.Height));
                     if(pieces.empty())
                         break;
                 }
@@ -495,6 +503,30 @@ namespace VisualFXExperiment
                 {
                     const int tileW = std::min(32, w - tileX);
                     const int srcX = tileX == 0 ? 0 : (tileX + 32 >= w ? 64 : 32);
+
+                    // The resizable draw queue is back-to-front. Cut the
+                    // footprints of ALL later blocks from the receiver tile,
+                    // including the casting block and any other occluders.
+                    // This fixes shadow bleed across layered, overlapping
+                    // and irregularly stacked resizable arrangements.
+                    std::vector<ShadowPiece> visibleTile(1,
+                        {x + tileX, y + tileY, tileW, tileH});
+                    for(size_t occluderIndex = rearIndex + 1;
+                         occluderIndex < sizable.size() && !visibleTile.empty();
+                         ++occluderIndex)
+                    {
+                        const Block_t& occluder = sizable[occluderIndex];
+                        if(occluder.Hidden || occluder.Invis || occluder.Type <= 0)
+                            continue;
+                        subtractShadowCover(visibleTile,
+                            camX + s_round2int(occluder.Location.X),
+                            camY + s_round2int(occluder.Location.Y),
+                            s_round2int(occluder.Location.Width),
+                            s_round2int(occluder.Location.Height));
+                    }
+                    if(visibleTile.empty())
+                        continue;
+
                     for(size_t i = 0; i < sprites.size(); ++i)
                     {
                         // Only suppress the shadow on the ACTUAL supporting block.
@@ -522,15 +554,22 @@ namespace VisualFXExperiment
                                 const int coverY = camY + s_round2int(support->Location.Y);
                                 const int coverW = s_round2int(support->Location.Width);
                                 const int coverH = s_round2int(support->Location.Height);
-                                drawReceiverShadowOutsideRect(sprites[i], x + tileX, y + tileY,
-                                                              tileW, tileH, receiver,
-                                                              srcX, srcY, shadow,
-                                                              coverX, coverY, coverW, coverH);
+                                for(const ShadowPiece& piece : visibleTile)
+                                    drawReceiverShadowOutsideRect(sprites[i],
+                                        piece.x, piece.y, piece.w, piece.h,
+                                        receiver,
+                                        srcX + piece.x - (x + tileX),
+                                        srcY + piece.y - (y + tileY),
+                                        shadow, coverX, coverY, coverW, coverH);
                                 continue;
                             }
                         }
-                        drawReceiverShadow(sprites[i], x + tileX, y + tileY, tileW, tileH,
-                                           receiver, srcX, srcY, shadow);
+                        for(const ShadowPiece& piece : visibleTile)
+                            drawReceiverShadow(sprites[i],
+                                piece.x, piece.y, piece.w, piece.h,
+                                receiver,
+                                srcX + piece.x - (x + tileX),
+                                srcY + piece.y - (y + tileY), shadow);
                     }
 
                     // Sizable blocks are rendered in Y-sorted back-to-front
@@ -588,13 +627,16 @@ namespace VisualFXExperiment
                                 caster.src_y = casterSrcY;
                                 caster.casts_shadow = true;
 
-                                // Suppress shadow pixels covered by the front
-                                // block itself, while retaining their spill
-                                // onto visible, opaque rear block pixels.
-                                drawReceiverShadowOutsideRect(
-                                    caster, x + tileX, y + tileY,
-                                    tileW, tileH, receiver, srcX, srcY, shadow,
-                                    frontX, frontY, frontW, frontH);
+                                // Shadow receivers are clipped to the
+                                // visible rear-block pixels above. No shadows
+                                // from a hidden receiver can overlay a front
+                                // block, including the caster itself.
+                                for(const ShadowPiece& piece : visibleTile)
+                                    drawReceiverShadow(caster,
+                                        piece.x, piece.y, piece.w, piece.h,
+                                        receiver,
+                                        srcX + piece.x - (x + tileX),
+                                        srcY + piece.y - (y + tileY), shadow);
                             }
                         }
                     }
