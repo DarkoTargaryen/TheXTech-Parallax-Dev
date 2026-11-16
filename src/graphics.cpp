@@ -429,15 +429,60 @@ void GetvScreenAuto(vScreen_t& vscreen)
        screen.Type == 7 || !screen.Visible)
         return;
 
-    const int sectionId = Player[vscreen.player].Section;
+    // The first player controls deliberate camera looks, even on shared
+    // multiplayer screens (where vscreen.player may be unset).
+    const Player_t& cameraPlayer = Player[1];
+    if(cameraPlayer.Dead || cameraPlayer.Section < 0)
+        return;
+
+    const int sectionId = cameraPlayer.Section;
     const SpeedlessLocation_t& section = level[sectionId];
     const double sectionHeight = section.Height - section.Y;
+    auto& look = vscreen.small_screen_features;
+
+    // Do not carry camera look offsets between sections.
+    if(look.camera_section != sectionId)
+    {
+        look.camera_section = sectionId;
+        look.look_direction = 0;
+        look.look_hold_frames = 0;
+        look.look_offset_y = 0;
+    }
+
+    // TheXTech simulates 65 frames per second. The action starts only after
+    // four full seconds of uninterrupted Up or Down by Player 1.
+    const bool canLook = GamePaused == PauseCode::None && !qScreen &&
+                         !ForcedControls && LevelMacro == LEVELMACRO_OFF &&
+                         cameraPlayer.Effect == PLREFF_NORMAL;
+    const int direction = (canLook && cameraPlayer.Controls.Up != cameraPlayer.Controls.Down)
+        ? (cameraPlayer.Controls.Up ? 1 : -1) : 0;
+
+    if(direction == 0 || direction != look.look_direction)
+    {
+        look.look_direction = direction;
+        look.look_hold_frames = 0;
+    }
+    else if(look.look_hold_frames < 260)
+        ++look.look_hold_frames;
+
+    const int maxLook = sectionHeight <= 600.0 ? 60 : 120;
+    const int wantedLook = (look.look_hold_frames >= 260) ? -direction * maxLook : 0;
+    if(look.look_offset_y < wantedLook)
+        look.look_offset_y = SDL_min(look.look_offset_y + 2, wantedLook);
+    else if(look.look_offset_y > wantedLook)
+        look.look_offset_y = SDL_max(look.look_offset_y - 2, wantedLook);
 
     if(sectionHeight <= 600.0)
     {
-        // A 600px level has only 60px of surplus vertical movement at 540px.
-        // Keep the floor visible and avoid moving the camera during jumps.
-        vscreen.Y = -(section.Height - vscreen.Height);
+        // 600px-high SMBX sections normally stay fixed at the floor.
+        // Look Up pans to the top 60px after four seconds, and releasing
+        // returns smoothly to the default floor-aligned position.
+        const double minY = -(section.Height - vscreen.Height);
+        const double maxY = -section.Y;
+        double y = minY + look.look_offset_y;
+        if(y < minY) y = minY;
+        if(y > maxY) y = maxY;
+        vscreen.Y = y;
         return;
     }
 
@@ -466,7 +511,9 @@ void GetvScreenAuto(vScreen_t& vscreen)
     // The upper/lower safe bands stop ordinary jumps from moving the screen.
     const double minY = -(section.Height - vscreen.Height);
     const double maxY = -section.Y;
-    double y = previousY;
+    // Remove last frame's intentional look offset before the normal
+    // dead-zone calculation; otherwise holding Up would drift indefinitely.
+    double y = previousY - look.look_offset_y;
     if(y < minY) y = minY;
     if(y > maxY) y = maxY;
 
@@ -477,6 +524,9 @@ void GetvScreenAuto(vScreen_t& vscreen)
     if(bottomY + y > vscreen.Height - bottomMargin)
         y = vscreen.Height - bottomMargin - bottomY;
 
+    if(y < minY) y = minY;
+    if(y > maxY) y = maxY;
+    y += look.look_offset_y;
     if(y < minY) y = minY;
     if(y > maxY) y = maxY;
     vscreen.Y = y;
