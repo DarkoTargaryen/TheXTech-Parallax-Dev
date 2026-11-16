@@ -770,7 +770,7 @@ namespace VisualFXExperiment
                 const int wx = camX + s_round2int(water.Location.X);
                 const int wy = camY + s_round2int(water.Location.Y);
                 const int ww = s_round2int(water.Location.Width);
-                if(x < wx + ww && x + w > wx && y < wy && y + h >= wy - 112)
+                if(x < wx + ww && x + w > wx && y < wy && y + h >= wy - 192)
                 {
                     nearWater = true;
                     break;
@@ -797,9 +797,76 @@ namespace VisualFXExperiment
         }
     }
 
-    static void drawReflections(const std::vector<Sprite>& sprites,
-                                int camX, int camY, int screenWidth, int screenHeight)
+    // Reflection-only BGO sprites. The visual source frame is the same one
+    // used by the ordinary BGO renderer, including animated BGO frames.
+    static void appendBGOReflectionSprites(
+        const std::vector<BaseRef_t>& bgos,
+        int camX, int camY, int screenWidth, int screenHeight,
+        std::vector<Sprite>& sprites)
     {
+        for(BaseRef_t ref : bgos)
+        {
+            const int id = static_cast<int>(ref);
+            if(id <= 0 || id > numBackground)
+                continue;
+            const Background_t& bgo = Background[id];
+            if(bgo.Hidden || bgo.Type <= 0)
+                continue;
+            const int x = camX + s_round2int(bgo.Location.X);
+            const int y = camY + s_round2int(bgo.Location.Y);
+            const int w = BackgroundWidth[bgo.Type];
+            const int h = BackgroundHeight[bgo.Type];
+            if(w <= 0 || h <= 0 || x >= screenWidth || x + w <= 0)
+                continue;
+
+            // Avoid collecting background decoration that cannot appear
+            // in any water reflection.
+            bool nearWater = false;
+            for(int id : treeWaterQuery(-camX, -camY,
+                                        -camX + screenWidth, -camY + screenHeight,
+                                        SORTMODE_ID))
+            {
+                const Water_t& water = Water[id];
+                if(water.Hidden || water.Quicksand)
+                    continue;
+                const int wx = camX + s_round2int(water.Location.X);
+                const int wy = camY + s_round2int(water.Location.Y);
+                const int ww = s_round2int(water.Location.Width);
+                if(x < wx + ww && x + w > wx && y < wy && y + h >= wy - 192)
+                {
+                    nearWater = true;
+                    break;
+                }
+            }
+            if(!nearWater)
+                continue;
+
+            addSprite(sprites, GFXBackgroundBMP[bgo.Type],
+                      x, y, w, h, 0, h * BackgroundFrame[bgo.Type],
+                      screenWidth, screenHeight,
+                      nullptr, 0.0, 0, false, false, false);
+        }
+    }
+
+    struct ReflectionWaterRect
+    {
+        int left, top, right, bottom;
+    };
+
+    struct ReflectionWaterGroup
+    {
+        int surface_y;
+        std::vector<ReflectionWaterRect> rects;
+    };
+
+    // Combine horizontally touching water areas when their surface heights
+    // match. Levels frequently use several adjacent Moondust water rectangles
+    // to represent one pool, so they should share one continuous reflection.
+    // Retaining the rectangles avoids filling gaps or deeper/shallow regions.
+    static std::vector<ReflectionWaterGroup> collectReflectionWaterGroups(
+        int camX, int camY, int screenWidth, int screenHeight)
+    {
+        std::vector<ReflectionWaterRect> remaining;
         for(int n : treeWaterQuery(-camX, -camY,
                                    -camX + screenWidth, -camY + screenHeight,
                                    SORTMODE_ID))
@@ -807,10 +874,77 @@ namespace VisualFXExperiment
             const Water_t& water = Water[n];
             if(water.Hidden || water.Quicksand)
                 continue;
-            const int wx = camX + s_round2int(water.Location.X);
-            const int wy = camY + s_round2int(water.Location.Y);
-            const int ww = s_round2int(water.Location.Width);
-            const int wh = s_round2int(water.Location.Height);
+            const int left = camX + s_round2int(water.Location.X);
+            const int top = camY + s_round2int(water.Location.Y);
+            const int right = left + s_round2int(water.Location.Width);
+            const int bottom = top + s_round2int(water.Location.Height);
+            if(right <= left || bottom <= top)
+                continue;
+            remaining.push_back({left, top, right, bottom});
+        }
+
+        std::vector<ReflectionWaterGroup> groups;
+        while(!remaining.empty())
+        {
+            ReflectionWaterGroup group;
+            group.surface_y = remaining.back().top;
+            group.rects.push_back(remaining.back());
+            remaining.pop_back();
+
+            // Iterate until no more connected segments can be absorbed.
+            // This handles arbitrary rectangle ordering and chain connections.
+            bool changed = true;
+            while(changed)
+            {
+                changed = false;
+                for(size_t i = 0; i < remaining.size();)
+                {
+                    const ReflectionWaterRect& candidate = remaining[i];
+                    bool adjacent = false;
+                    if(std::abs(candidate.top - group.surface_y) <= 1)
+                    {
+                        for(const ReflectionWaterRect& current : group.rects)
+                        {
+                            if(candidate.left <= current.right + 1 &&
+                               candidate.right + 1 >= current.left)
+                            {
+                                adjacent = true;
+                                break;
+                            }
+                        }
+                    }
+                    if(adjacent)
+                    {
+                        group.rects.push_back(candidate);
+                        remaining.erase(remaining.begin() + i);
+                        changed = true;
+                    }
+                    else
+                        ++i;
+                }
+            }
+            groups.push_back(std::move(group));
+        }
+        return groups;
+    }
+
+    static void drawReflections(const std::vector<Sprite>& sprites,
+                                int camX, int camY, int screenWidth, int screenHeight)
+    {
+        // This is a purely visual option. When disabled, no custom reflection
+        // or ripple draw calls run and TheXTech's ordinary water stays intact.
+        if(!g_config.water_reflections)
+            return;
+
+        const std::vector<ReflectionWaterGroup> groups =
+            collectReflectionWaterGroups(camX, camY, screenWidth, screenHeight);
+
+        for(const ReflectionWaterGroup& group : groups)
+        {
+            const int wy = group.surface_y;
+            int waterBottom = wy;
+            for(const ReflectionWaterRect& rect : group.rects)
+                waterBottom = std::max(waterBottom, rect.bottom);
 
             for(const Sprite& sprite : sprites)
             {
@@ -818,7 +952,7 @@ namespace VisualFXExperiment
                 int groupBottom = sprite.y + sprite.height;
                 if(sprite.is_actor)
                 {
-                    // Mount/rider components share a single submersion curve.
+                    // Rider and mount share one submersion fade.
                     for(const Sprite& part : sprites)
                     {
                         if(!part.is_actor || part.is_player != sprite.is_player ||
@@ -830,9 +964,6 @@ namespace VisualFXExperiment
                     }
                 }
 
-                // Preserve the whole mirrored silhouette instead of cropping
-                // it abruptly at the waterline. A smooth opacity transition
-                // handles entry/exit and hides portions behind the real actor.
                 const double totalHeight = std::max(1, groupBottom - groupTop);
                 const double visible = std::max(0.0, std::min(1.0,
                     (wy - groupTop) / totalHeight));
@@ -843,21 +974,28 @@ namespace VisualFXExperiment
                 Sprite mirrored = sprite;
                 mirrored.y = 2 * wy - (sprite.y + sprite.height);
                 const int startY = std::max(wy, mirrored.y);
-                const int endY = std::min(wy + wh, mirrored.y + mirrored.height);
+                const int endY = std::min(waterBottom, mirrored.y + mirrored.height);
                 if(startY >= endY)
                     continue;
 
-                for(int stripY = startY; stripY < endY; stripY += 4)
+                for(int stripY = startY; stripY < endY;)
                 {
-                    const int stripH = std::min(4, endY - stripY);
+                    int stripH = std::min(4, endY - stripY);
+                    // Never draw below the bottom edge of an individual
+                    // rectangle, even when neighbouring segments have
+                    // different depths.
+                    for(const ReflectionWaterRect& rect : group.rects)
+                    {
+                        if(rect.bottom > stripY && rect.bottom < stripY + stripH)
+                            stripH = rect.bottom - stripY;
+                    }
+
                     const int depth = stripY - wy;
-                    const double depthFade = std::max(0.0, 1.0 - depth / 112.0);
+                    // The original fade was 112px. Extend it gently to 192px.
+                    const double depthFade = std::max(0.0, 1.0 - depth / 192.0);
                     if(depthFade <= 0.0)
                         break;
 
-                    // Fade across the actor/reflection intersection instead
-                    // of imposing the previous hard 'start at groupBottom'.
-                    // This keeps a natural reflection when jumping into water.
                     double overlapFade = 1.0;
                     if(sprite.is_actor && groupBottom > wy)
                     {
@@ -867,14 +1005,43 @@ namespace VisualFXExperiment
                     }
                     const int opacity = s_round2int(110 * depthFade *
                                                      submersionFade * overlapFade);
-                    if(opacity <= 0)
-                        continue;
-                    const double phase = depth * 0.19 + CommonFrame * 0.055;
-                    const int shift = s_round2int(std::sin(phase) * 2.0);
-                    Sprite rippled = mirrored;
-                    rippled.x += shift;
-                    drawClipped(rippled, wx, stripY, ww, stripH, true,
-                                XTColor(155, 195, 220, static_cast<uint8_t>(opacity)));
+                    if(opacity > 0)
+                    {
+                        const double phase = depth * 0.19 + CommonFrame * 0.055;
+                        const int shift = s_round2int(std::sin(phase) * 2.0);
+                        Sprite rippled = mirrored;
+                        rippled.x += shift;
+
+                        // Combine the horizontal intersections of all active
+                        // rectangles for this strip. Each pixel is rendered at
+                        // most once, so touching/overlapping areas have no seam.
+                        std::vector<std::pair<int, int>> spans;
+                        for(const ReflectionWaterRect& rect : group.rects)
+                        {
+                            if(rect.top > stripY || rect.bottom <= stripY)
+                                continue;
+                            const int left = std::max(rect.left, rippled.x);
+                            const int right = std::min(rect.right, rippled.x + rippled.width);
+                            if(right > left)
+                                spans.emplace_back(left, right);
+                        }
+                        std::sort(spans.begin(), spans.end());
+                        for(size_t i = 0; i < spans.size();)
+                        {
+                            const int left = spans[i].first;
+                            int right = spans[i].second;
+                            ++i;
+                            while(i < spans.size() && spans[i].first <= right)
+                            {
+                                right = std::max(right, spans[i].second);
+                                ++i;
+                            }
+                            drawClipped(rippled, left, stripY, right - left, stripH,
+                                        true, XTColor(155, 195, 220,
+                                        static_cast<uint8_t>(opacity)));
+                        }
+                    }
+                    stripY += stripH;
                 }
             }
         }
