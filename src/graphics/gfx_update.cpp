@@ -2165,19 +2165,14 @@ void UpdateGraphicsScreen(Screen_t& screen)
             VisualFXExperiment::collectSprites(camX, camY,
                                                vScreen[Z].Width, vScreen[Z].Height,
                                                screenMainBlocks, visualFXSprites);
-            // Capture crossings and distort only BGOs overlapped by real water.
-            // Draw this before shadows and actor reflections to keep depth order.
-            if(g_config.enhanced_water_fx)
-            {
-                VisualFXExperiment::updateWaterRippleFX(visualFXSprites, camX, camY,
-                                                        vScreen[Z].Width, vScreen[Z].Height);
-                XRender::setDrawPlane(PLANE_LVL_BGO_NORM + 1);
-                VisualFXExperiment::drawWaterBgoFX(screenBackgrounds, camX, camY,
-                                                    vScreen[Z].Width, vScreen[Z].Height);
-            }
+            // Classic shadows remain untouched by water reflection sprites.
             XRender::setDrawPlane(PLANE_LVL_BGO_NORM + 2);
             VisualFXExperiment::drawShadows(visualFXSprites, camX, camY,
                                              screenBackgrounds, screenSBlocks);
+            // Add sizable blocks for reflections only (after shadow collection).
+            VisualFXExperiment::appendResizableReflectionSprites(
+                screenSBlocks, camX, camY,
+                vScreen[Z].Width, vScreen[Z].Height, visualFXSprites);
             XRender::setDrawPlane(PLANE_LVL_BGO_NORM + 3);
             VisualFXExperiment::drawReflections(visualFXSprites, camX, camY,
                                                  vScreen[Z].Width, vScreen[Z].Height);
