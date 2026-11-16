@@ -190,6 +190,10 @@ void ProcessSmallScreenCam(vScreen_t& vscreen)
 
 void DrawSmallScreenCam(vScreen_t& vscreen)
 {
+    // The 960x540 look controls do not display the small-screen camera icon.
+    if(g_config.internal_res.m_value.first == 960 && g_config.internal_res.m_value.second == 540)
+        return;
+
     const Screen_t& screen = Screens[vscreen.screen_ref];
     const Screen_t& c_screen = screen.canonical_screen();
 
