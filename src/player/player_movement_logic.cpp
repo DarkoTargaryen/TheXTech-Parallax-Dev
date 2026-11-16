@@ -452,6 +452,50 @@ void PlayerCockpitMovementX(int A)
 
 void PlayerMovementY(int A)
 {
+    Player_t& assistedPlayer = Player[A];
+    // Timers belong to each player; do not modify unique jump, flight or
+    // movement abilities. Assistance applies only to normal ground jumps.
+    const bool grounded = (assistedPlayer.Location.SpeedY == 0.0 ||
+                           assistedPlayer.StandingOnNPC != 0 || assistedPlayer.Slope > 0);
+    const bool eligible = assistedPlayer.Mount == 0 && !assistedPlayer.Fairy &&
+                          !assistedPlayer.Stoned && !assistedPlayer.Dead &&
+                          assistedPlayer.Wet == 0 && !assistedPlayer.WetFrame &&
+                          assistedPlayer.Quicksand == 0 && assistedPlayer.Vine == 0 &&
+                          !assistedPlayer.ShellSurf && assistedPlayer.GrabTime == 0;
+
+    if(!g_config.coyote_time || !eligible)
+        assistedPlayer.coyoteFrames = 0;
+    else if(grounded)
+        assistedPlayer.coyoteFrames = 5;
+    else if(assistedPlayer.coyoteFrames > 0)
+        --assistedPlayer.coyoteFrames;
+
+    if(!g_config.jump_buffering || !eligible)
+    {
+        assistedPlayer.jumpBufferFrames = 0;
+        assistedPlayer.spinBufferFrames = 0;
+    }
+    else
+    {
+        if(assistedPlayer.jumpBufferFrames > 0)
+            --assistedPlayer.jumpBufferFrames;
+        if(assistedPlayer.spinBufferFrames > 0)
+            --assistedPlayer.spinBufferFrames;
+
+        // A press before landing remains available for five gameplay frames.
+        if(!grounded && assistedPlayer.Location.SpeedY >= 0 &&
+           assistedPlayer.JumpRelease && assistedPlayer.Controls.Jump)
+            assistedPlayer.jumpBufferFrames = 5;
+        if(!grounded && assistedPlayer.Location.SpeedY >= 0 &&
+           assistedPlayer.JumpRelease && assistedPlayer.Controls.AltJump)
+            assistedPlayer.spinBufferFrames = 5;
+    }
+    const bool coyoteJump = eligible && assistedPlayer.coyoteFrames > 0 &&
+                            assistedPlayer.Location.SpeedY >= 0;
+    const bool bufferedJump = eligible && grounded &&
+                              assistedPlayer.jumpBufferFrames > 0;
+    const bool bufferedSpin = eligible && grounded &&
+                              assistedPlayer.spinBufferFrames > 0;
     if(Player[A].Mount == 1) // this gives the player the bounce when in the kurbio's shoe
     {
         if(Player[A].Controls.Left || Player[A].Controls.Right)
@@ -498,7 +542,7 @@ void PlayerMovementY(int A)
         Player[A].CanFloat = false;
 
     // handles the regular jump
-    if(Player[A].Controls.Jump || (Player[A].Controls.AltJump &&
+    if(Player[A].Controls.Jump || bufferedJump || (Player[A].Controls.AltJump &&
        ((Player[A].Character > 3 && Player[A].Character != 4) || Player[A].Quicksand > 0 || g_config.disable_spin_jump) &&
        Player[A].CanAltJump))
     {
@@ -526,11 +570,15 @@ void PlayerMovementY(int A)
         else
         {
             if((Player[A].Vine > 0 || Player[A].Location.SpeedY == 0 || Player[A].StandingOnNPC != 0 ||
-                MultiHop || Player[A].Slope > 0 || (Player[A].Location.SpeedY > 0 && Player[A].Quicksand > 0)) && Player[A].CanJump)
+                MultiHop || Player[A].Slope > 0 || coyoteJump || (Player[A].Location.SpeedY > 0 && Player[A].Quicksand > 0)) &&
+               (Player[A].CanJump || bufferedJump))
             {
                 PlaySoundSpatial(SFX_Jump, Player[A].Location); // Jump sound
                 Player[A].Location.SpeedY = Physics.PlayerJumpVelocity - tempSpeed;
                 Player[A].Jump = Physics.PlayerJumpHeight;
+                Player[A].coyoteFrames = 0;
+                Player[A].jumpBufferFrames = 0;
+                Player[A].spinBufferFrames = 0;
 
                 if(Player[A].Character == 4 && (Player[A].State == 4 || Player[A].State == 5) && !Player[A].SpinJump)
                     Player[A].DoubleJump = true;
@@ -692,7 +740,7 @@ void PlayerMovementY(int A)
     }
 
      // START ALT JUMP - this code does the player's spin jump
-    if(Player[A].Controls.AltJump &&
+    if((Player[A].Controls.AltJump || bufferedSpin) &&
        (Player[A].Character == 1 ||
         Player[A].Character == 2 ||
         Player[A].Character == 3 ||
@@ -705,7 +753,8 @@ void PlayerMovementY(int A)
         else
             tempSpeed = -Player[A].Location.SpeedX * 0.2;
 
-        if((Player[A].Vine > 0 || Player[A].Location.SpeedY == 0 || Player[A].StandingOnNPC != 0 || Player[A].Slope > 0 || MultiHop) && Player[A].CanAltJump) // Player Jumped
+        if((Player[A].Vine > 0 || Player[A].Location.SpeedY == 0 || Player[A].StandingOnNPC != 0 || Player[A].Slope > 0 || MultiHop || coyoteJump) &&
+           (Player[A].CanAltJump || bufferedSpin)) // Player Jumped
         {
             if(!Player[A].Duck)
             {
@@ -713,6 +762,9 @@ void PlayerMovementY(int A)
                 Player[A].SpinFireDir = Player[A].Direction;
                 Player[A].Location.SpeedY = Physics.PlayerJumpVelocity - tempSpeed;
                 Player[A].Jump = Physics.PlayerJumpHeight;
+                Player[A].coyoteFrames = 0;
+                Player[A].jumpBufferFrames = 0;
+                Player[A].spinBufferFrames = 0;
                 if(Player[A].Character == 2)
                     Player[A].Jump += 3;
 
