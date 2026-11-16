@@ -282,7 +282,9 @@ void DynamicScreen(Screen_t& screen, bool mute)
                 vscreen1.Top = 0;
                 GetvScreenAverage2(vscreen1);
                 if(screen.DType != 1 && !mute)
-                    PlaySound(SFX_Camera);
+                    if(g_config.internal_res.m_value.first != 960 ||
+                        g_config.internal_res.m_value.second != 540)
+                        PlaySound(SFX_Camera);
                 for(A = 1; A <= 2; A++)
                 {
                     vScreen_t& vscreena = screen.vScreen(A);
@@ -314,7 +316,9 @@ void DynamicScreen(Screen_t& screen, bool mute)
                 vscreen2.Top = 0;
                 GetvScreenAverage2(vscreen1);
                 if(screen.DType != 2 && !mute)
-                    PlaySound(SFX_Camera);
+                    if(g_config.internal_res.m_value.first != 960 ||
+                        g_config.internal_res.m_value.second != 540)
+                        PlaySound(SFX_Camera);
                 for(A = 1; A <= 2; A++)
                 {
                     vScreen_t& vscreena = screen.vScreen(A);
@@ -346,7 +350,9 @@ void DynamicScreen(Screen_t& screen, bool mute)
                 vscreen2.Top = 0;
                 GetvScreenAverage2(vscreen1);
                 if(screen.DType != 3 && !mute)
-                    PlaySound(SFX_Camera);
+                    if(g_config.internal_res.m_value.first != 960 ||
+                        g_config.internal_res.m_value.second != 540)
+                        PlaySound(SFX_Camera);
                 for(A = 1; A <= 2; A++)
                 {
                     vScreen_t& vscreena = screen.vScreen(A);
@@ -377,7 +383,9 @@ void DynamicScreen(Screen_t& screen, bool mute)
                 vscreen2.Top = screen.H / 2.0;
                 GetvScreenAverage2(vscreen1);
                 if(screen.DType != 4 && !mute)
-                    PlaySound(SFX_Camera);
+                    if(g_config.internal_res.m_value.first != 960 ||
+                        g_config.internal_res.m_value.second != 540)
+                        PlaySound(SFX_Camera);
                 for(A = 1; A <= 2; A++)
                 {
                     vScreen_t& vscreena = screen.vScreen(A);
@@ -395,6 +403,8 @@ void DynamicScreen(Screen_t& screen, bool mute)
                 if(vscreen2.Visible)
                 {
                     if(screen.DType != 5 && !mute)
+                        if(g_config.internal_res.m_value.first != 960 ||
+                        g_config.internal_res.m_value.second != 540)
                         PlaySound(SFX_Camera);
                     vscreen2.Visible = false;
                     vscreen1.Height = screen.H;
@@ -438,7 +448,9 @@ void DynamicScreen(Screen_t& screen, bool mute)
             vscreen2.TempY = 0;
             GetvScreenAverage2(vscreen1);
             if(screen.DType != 6 && !mute)
-                PlaySound(SFX_Camera);
+                if(g_config.internal_res.m_value.first != 960 ||
+                        g_config.internal_res.m_value.second != 540)
+                        PlaySound(SFX_Camera);
             screen.DType = 6;
             vscreen2.Visible = true;
         }
