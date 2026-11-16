@@ -400,10 +400,6 @@ public:
     /* ---- Video - Effects ----*/
     subsection effects{this, "effects", "Screen Effects"};
 
-    opt<bool> enhanced_water_fx{this, defaults(false), {}, Scope::Config,
-        "enhanced-water-fx", "Enhanced water & reflections",
-        "Ripples and distorted water BGOs inside existing water areas; retains classic visuals when Off"};
-
     opt<bool> show_screen_shake{this,
         defaults(true), {CompatClass::pure_preference, true}, Scope::Config,
         "show-screen-shake", "Screen shake", nullptr};
