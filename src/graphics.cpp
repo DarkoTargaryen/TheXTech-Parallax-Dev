@@ -407,6 +407,7 @@ void GetvScreenAverage3(vScreen_t& vscreen)
 void GetvScreenAuto(vScreen_t& vscreen)
 {
     const Screen_t& screen = Screens[vscreen.screen_ref];
+    const double previousY = vscreen.Y;
 
     if(screen.Type == 3)
         GetvScreenAverage3(vscreen);
@@ -416,6 +417,69 @@ void GetvScreenAuto(vScreen_t& vscreen)
         GetvScreenCredits(vscreen);
     else
         GetvScreen(vscreen);
+
+    // 960x540 mode: original SMBX levels are usually at least 600px high.
+    // Keep 600px-tall sections vertically stable and add a dead zone for
+    // taller sections, instead of centering the camera on every jump.
+    // Other resolutions and game modes preserve the existing camera logic.
+    if(g_config.internal_res.m_value.first != 960 ||
+       g_config.internal_res.m_value.second != 540 ||
+       XRender::TargetW != 960 || XRender::TargetH != 540 ||
+       GameMenu || LevelEditor || LevelSelect || vscreen.Height != 540 ||
+       screen.Type == 7 || !screen.Visible)
+        return;
+
+    const int sectionId = Player[vscreen.player].Section;
+    const SpeedlessLocation_t& section = level[sectionId];
+    const double sectionHeight = section.Height - section.Y;
+
+    if(sectionHeight <= 600.0)
+    {
+        // A 600px level has only 60px of surplus vertical movement at 540px.
+        // Keep the floor visible and avoid moving the camera during jumps.
+        vscreen.Y = -(section.Height - vscreen.Height);
+        return;
+    }
+
+    // Follow all players sharing this viewport; if their spread exceeds the
+    // dead zone, retain the engine's normal group camera calculation.
+    bool foundPlayer = false;
+    double topY = 0.0, bottomY = 0.0;
+    for(int i = 0; i < screen.player_count; ++i)
+    {
+        const Player_t& player = Player[screen.players[i]];
+        if(player.Dead || player.Section != sectionId)
+            continue;
+
+        const double playerTop = (player.Effect == PLREFF_RESPAWN) ? player.Effect2 : player.Location.Y;
+        const double playerBottom = playerTop + player.Location.Height;
+        if(!foundPlayer || playerTop < topY)
+            topY = playerTop;
+        if(!foundPlayer || playerBottom > bottomY)
+            bottomY = playerBottom;
+        foundPlayer = true;
+    }
+    if(!foundPlayer || bottomY - topY > vscreen.Height - 160.0)
+        return;
+
+    // Reuse the previous camera position, clamped to the current section.
+    // The upper/lower safe bands stop ordinary jumps from moving the screen.
+    const double minY = -(section.Height - vscreen.Height);
+    const double maxY = -section.Y;
+    double y = previousY;
+    if(y < minY) y = minY;
+    if(y > maxY) y = maxY;
+
+    constexpr double topMargin = 140.0;
+    constexpr double bottomMargin = 140.0;
+    if(topY + y < topMargin)
+        y = topMargin - topY;
+    if(bottomY + y > vscreen.Height - bottomMargin)
+        y = vscreen.Height - bottomMargin - bottomY;
+
+    if(y < minY) y = minY;
+    if(y > maxY) y = maxY;
+    vscreen.Y = y;
 }
 
 void SharedScreenAvoidJump_Pre(Screen_t& screen)
