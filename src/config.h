@@ -143,6 +143,15 @@ public:
 
     static constexpr bool enable_editor = true;
 
+    /* ---- Main - Movement Assistance ----*/
+    subsection main_movement_assistance{this, "movement-assistance", "Movement Assistance"};
+
+    opt<bool> coyote_time{this, defaults(false), {}, Scope::Config,
+        "coyote-time", "Coyote Time", "Allow jumping briefly after leaving a platform"};
+
+    opt<bool> jump_buffering{this, defaults(false), {}, Scope::Config,
+        "jump-buffering", "Jump Buffering", "Remember a jump pressed just before landing"};
+
     /* ---- Main - Frame Timing ----*/
     subsection main_frame_timing{this, "timing", "Frame Timing"};
 
