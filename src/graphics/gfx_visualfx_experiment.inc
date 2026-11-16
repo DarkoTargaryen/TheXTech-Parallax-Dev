@@ -545,6 +545,21 @@ namespace VisualFXExperiment
                         const int frontY = camY + s_round2int(front.Location.Y);
                         const int frontW = s_round2int(front.Location.Width);
                         const int frontH = s_round2int(front.Location.Height);
+
+                        // Blocks resting directly on one another share a
+                        // structural contact edge, not a depth-separated
+                        // surface. Do not cast either block's offset shadow
+                        // onto its vertical support. Other background
+                        // resizables remain valid shadow receivers.
+                        const bool horizontalOverlap =
+                            frontX < x + w && frontX + frontW > x;
+                        const bool stackedContact =
+                            horizontalOverlap &&
+                            (std::abs((frontY + frontH) - y) <= 2 ||
+                             std::abs((y + h) - frontY) <= 2);
+                        if(stackedContact)
+                            continue;
+
                         if(frontW <= 0 || frontH <= 0 ||
                            frontX + frontW + 8 <= x + tileX ||
                            frontX + 8 >= x + tileX + tileW ||
