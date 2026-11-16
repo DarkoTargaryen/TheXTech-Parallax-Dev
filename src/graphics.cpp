@@ -525,12 +525,12 @@ void GetvScreenAuto(vScreen_t& vscreen)
     if(y > maxY) y = maxY;
     if(extraHeight <= 0.0)
         y = minY;
-    else if(extraHeight < 140.0)
+    else if(extraHeight < 140.0 &&
+            bottomY >= section.Height - 96.0 && maxFallSpeed <= 0.5)
     {
-        // Limit excessive sky space in slightly-taller sections without
-        // snapping the camera back every time the player jumps.
-        const double allowableRise = extraHeight * (extraHeight / 140.0);
-        y = SDL_min(y, minY + allowableRise);
+        // Gently settle toward the floor when returning to low ground.
+        // Do not constrain upward tracking in short vertical sections.
+        y = SDL_max(minY, y - 3.0);
     }
 
     // Only move the camera when a player leaves the safe portion of the
