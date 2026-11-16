@@ -36,6 +36,12 @@ void ResetCameraPanning()
 
 void ProcessSmallScreenCam(vScreen_t& vscreen)
 {
+    // 960x540 uses its own silent 4-second look controls; do not run the
+    // legacy small-screen pan/sound logic on top of it.
+    if(g_config.internal_res.m_value.first == 960 &&
+       g_config.internal_res.m_value.second == 540)
+        return;
+
     const Screen_t& screen = Screens[vscreen.screen_ref];
     const Screen_t& c_screen = screen.canonical_screen();
     const Player_t& p = Player[vscreen.player];
